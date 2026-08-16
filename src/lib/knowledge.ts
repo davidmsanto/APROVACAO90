@@ -1,315 +1,195 @@
-/* ============================================================
-   Base calibrada A90 — conteúdo autoral com incidência (1–5)
-   em provas estilo Cebraspe. Alimenta o motor local e serve de
-   "ground truth" nos prompts enviados ao provedor de IA.
-   ============================================================ */
-
-export type AiMode = "flashcards" | "quiz" | "resumo";
-
-export interface Subject {
-  id: string;
-  name: string;
-  short: string;
-  color: string;
-}
+/* ============ base calibrada A90 · o que MAIS CAI em prova ============ */
 
 export interface AiItem {
   id: string;
   subjectId: string;
-  topic: string;
-  q: string; // pergunta do flashcard
-  a: string; // resposta do flashcard
-  ce: string; // assertiva Certo/Errado
-  ceTrue: boolean; // gabarito da assertiva
-  expl: string; // explicação
-  wrong: string; // pegadinha clássica
-  points: string[]; // bullets do resumo
+  topicId: string;
   inc: number; // incidência 1–5
+  q: string; // proposição correta
+  a: string; // resposta / explicação
+  expl: string;
+  points: string[];
+  wrong: string; // pegadinha (parece certa, mas é ERRADA)
 }
 
-export const SUBJECTS: Subject[] = [
-  { id: "por", name: "Português", short: "PT", color: "#5cb3ff" },
-  { id: "rlm", name: "Raciocínio Lógico", short: "RLM", color: "#f5b84b" },
-  { id: "inf", name: "Informática", short: "INFO", color: "#c9a2ff" },
-  { id: "dcn", name: "Direito Constitucional", short: "DC", color: "#38ff8a" },
-  { id: "dad", name: "Direito Administrativo", short: "DA", color: "#f0655f" },
-];
+export const AI_SUBJECTS = ["por", "rlm", "inf", "dcn", "dad"];
 
 export const AI_BANK: AiItem[] = [
-  /* ---------- PORTUGUÊS ---------- */
+  /* ---------- Português ---------- */
   {
-    id: "por-1", subjectId: "por", topic: "Crase", inc: 5,
-    q: "Quando a crase é obrigatória e quando é proibida?",
-    a: "Obrigatória antes de palavra feminina que admita artigo, quando o termo regente exige a preposição 'a' (ex.: 'fui à delegacia'). Proibida antes de palavra masculina ('a pé', 'a prazo') e antes de verbo.",
-    ce: "Em 'O candidato foi a pé até o local de prova', o acento grave é obrigatório.",
-    ceTrue: false,
-    expl: "'Pé' é palavra masculina — antes de masculino não há crase. O 'a' é apenas preposição.",
-    wrong: "A banca troca o contexto e coloca 'à pé' ou 'à prazo' para você marcar certo pela sonoridade.",
-    points: [
-      "Crase = fusão da preposição 'a' + artigo 'a'.",
-      "Obrigatória: 'à + substantivo feminino determinado' (à prova, à noite, à delegacia).",
-      "Proibida: antes de masculino, verbo, pronome indefinido e 'a' no singular + palavra no plural.",
-    ],
+    id: "por1", subjectId: "por", topicId: "por-8", inc: 5,
+    q: "Ocorre crase na fusão da preposição 'a' com o artigo definido feminino 'a'.",
+    a: "A crase é a contração de dois 'a': a preposição exigida pelo termo regente + o artigo (ou pronome) feminino. Ex.: 'Fui à escola' (ir a + a escola).",
+    expl: "A crase só existe quando há termo regente que peça a preposição 'a' E termo regido feminino que aceite o artigo. Na dúvida, troque por um masculino: se virar 'ao', há crase.",
+    points: ["Crase = preposição 'a' + artigo 'a'", "Troque por palavra masculina: se der 'ao', tem crase", "Nunca antes de verbo, palavra masculina ou pronome pessoal"],
+    wrong: "Há crase em 'Vou a Brasília amanhã', pois Brasília é cidade.",
   },
   {
-    id: "por-2", subjectId: "por", topic: "Pontuação", inc: 5,
-    q: "Pode-se usar vírgula entre sujeito e verbo?",
-    a: "Não. É vedado separar com vírgula o sujeito do predicado, o verbo de seus complementos e o nome de seus complementos — mesmo que a ordem direta seja alterada por adjuntos longos.",
-    ce: "Na frase 'Os candidatos que estudaram com constância, foram aprovados', a vírgula está empregada corretamente.",
-    ceTrue: false,
-    expl: "A vírgula separa o sujeito ('Os candidatos que estudaram com constância') do verbo ('foram') — uso incorreto.",
-    wrong: "Inserir adjunto longo no meio para camuflar a separação entre sujeito e verbo.",
-    points: [
-      "Ordem direta: sujeito + verbo + complementos — sem vírgulas entre eles.",
-      "Adjunto adverbial deslocado: vírgula facultativa se curto, recomendada se longo.",
-      "Oração subordinada adjetiva explicativa sempre vem entre vírgulas; a restritiva, nunca.",
-    ],
+    id: "por2", subjectId: "por", topicId: "por-6", inc: 5,
+    q: "Na concordância verbal, o verbo concorda com o núcleo do sujeito em número e pessoa.",
+    a: "O verbo flexiona para concordar com o sujeito. Sujeito composto antes do verbo → plural. Depois do verbo → plural ou concordância com o mais próximo.",
+    expl: "A banca adora sujeito composto posposto e sujeito com núcleo no singular seguido de adjunto no plural (ex.: 'A maioria dos alunos passou').",
+    points: ["Verbo concorda com o núcleo do sujeito", "'A maioria de + plural' admite singular ou plural", "Sujeito posposto permite concordância atrativa"],
+    wrong: "Em 'Fazem dez anos que não o vejo', o verbo está correto por indicar tempo decorrido.",
   },
   {
-    id: "por-3", subjectId: "por", topic: "Concordância verbal", inc: 4,
-    q: "Como concordam os verbos 'haver' e 'fazer' impessoais?",
-    a: "'Haver' no sentido de existir e 'fazer' indicando tempo ficam na 3ª pessoa do singular: 'Havia muitos candidatos' (nunca 'haviam'), 'Faz dez anos' (nunca 'fazem').",
-    ce: "A forma 'Haviam muitas questões de lógica na prova' está correta segundo a norma-padrão.",
-    ceTrue: false,
-    expl: "'Haver' = existir é impessoal: sempre 3ª pessoa do singular → 'Havia muitas questões'.",
-    wrong: "Usar 'haviam' quando o substantivo seguinte está no plural, por atração.",
-    points: [
-      "'Haver' (existir/ocorrer) e 'fazer' (tempo) = impessoais, 3ª pessoa do singular.",
-      "O auxiliar herda a impessoalidade: 'deve haver', 'vai fazer dois anos'.",
-      "'Existir' NÃO é impessoal: 'Existiam muitas questões' — concorda normalmente.",
-    ],
-  },
-  {
-    id: "por-4", subjectId: "por", topic: "Regência e pronomes", inc: 3,
-    q: "Qual a regência de 'assistir' no sentido de ver?",
-    a: "'Assistir' (ver/presenciar) é transitivo indireto: 'assistir AO filme'. Já 'visar' (objetivar) rege 'a': 'visar AO cargo'. 'Implicar' (acarretar) é direto: 'implicou mudanças'.",
-    ce: "Em 'O candidato assistiu ao vídeo da aula inaugural', a regência está correta.",
-    ceTrue: true,
-    expl: "'Assistir' no sentido de ver exige preposição 'a': assistir AO vídeo.",
-    wrong: "Marcar errado por hipercorreção — muita gente acredita que 'assistir o vídeo' é o certo.",
-    points: [
-      "Assistir (ver) → VTI: assistir a algo. Assistir (ajudar) → VTD.",
-      "Visar (objetivar) → VTI: visar a algo. Visar (assinar) → VTD.",
-      "Implicar (acarretar) → VTD, sem preposição: 'implicou cortes'.",
-    ],
+    id: "por3", subjectId: "por", topicId: "por-1", inc: 4,
+    q: "A coerência diz respeito à relação lógica entre as ideias; a coesão, aos mecanismos linguísticos que conectam o texto.",
+    a: "Coerência = sentido, lógica interna. Coesão = recursos gramaticais (conjunções, pronomes, elipses) que costuram o texto.",
+    expl: "Questões de reescrita cobram se a troca de um conectivo preserva coerência E coesão. Um texto pode ser coeso e incoerente.",
+    points: ["Coerência = lógica das ideias", "Coesão = conectivos, pronomes, elipse", "Reescrita deve preservar sentido e correção"],
+    wrong: "Coesão e coerência são sinônimos, pois ambas tratam da conexão entre as partes do texto.",
   },
 
-  /* ---------- RACIOCÍNIO LÓGICO ---------- */
+  /* ---------- RLM ---------- */
   {
-    id: "rlm-1", subjectId: "rlm", topic: "Proposições e conectivos", inc: 5,
-    q: "Quando a conjunção 'e' é verdadeira? E a disjunção 'ou'?",
-    a: "'A ∧ B' só é verdadeira quando ambas são verdadeiras. 'A ∨ B' só é falsa quando ambas são falsas. Na condicional 'A → B', só há falsidade quando A é V e B é F (V→F = F).",
-    ce: "A proposição composta '2 é par e 3 é ímpar' é verdadeira.",
-    ceTrue: true,
-    expl: "Ambas as componentes são verdadeiras, logo a conjunção é verdadeira.",
-    wrong: "Confundir com a condicional: muitos acham que 'e' se comporta como 'se... então'.",
-    points: [
-      "∧ (e): V apenas se tudo V. ∨ (ou): F apenas se tudo F.",
-      "→ (se...então): F apenas no caso V→F. ↔ : V quando valores iguais.",
-      "A única linha falsa da condicional é antecedente V e consequente F.",
-    ],
+    id: "rlm1", subjectId: "rlm", topicId: "rlm-1", inc: 5,
+    q: "A condicional 'Se p, então q' só é falsa quando p é verdadeiro e q é falso.",
+    a: "Na tabela-verdade do condicional (p → q), a única linha falsa é V → F. Nas demais (V→V, F→V, F→F) o condicional é verdadeiro.",
+    expl: "Memorize: condicional só é falso com antecedente verdadeiro e consequente falso. A banca inverte isso em quase toda prova.",
+    points: ["p → q é falso apenas em V→F", "Falso antecedente torna o condicional verdadeiro", "Equivalência: p → q ≡ ~q → ~p"],
+    wrong: "O condicional 'Se p, então q' é falso sempre que p for falso.",
   },
   {
-    id: "rlm-2", subjectId: "rlm", topic: "Equivalências e negações", inc: 5,
-    q: "Qual a negação de 'Se chove, então levo o guarda-chuva'?",
-    a: "A negação de A → B é 'A ∧ ¬B': 'Chove e não levo o guarda-chuva'. Nunca se nega condicional com outra condicional.",
-    ce: "A negação de 'Se estudo, então passo' é 'Se não estudo, então não passo'.",
-    ceTrue: false,
-    expl: "Isso é a inversão (¬A → ¬B), que NÃO é a negação. A negação correta é 'Estudo e não passo'.",
-    wrong: "Apresentar a contrapositiva ou a inversão como se fossem a negação — pegadinha clássica Cebraspe.",
-    points: [
-      "Negação de A → B = A ∧ ¬B.",
-      "Equivalência de A → B = ¬A ∨ B = ¬B → ¬A (contrapositiva).",
-      "Negação de ∀x P(x) = ∃x ¬P(x) — e vice-versa.",
-    ],
+    id: "rlm2", subjectId: "rlm", topicId: "rlm-3", inc: 5,
+    q: "A negação de 'p e q' é '~p ou ~q' (Leis de De Morgan).",
+    a: "De Morgan: ~(p ∧ q) ≡ ~p ∨ ~q e ~(p ∨ q) ≡ ~p ∧ ~q. Nega-se cada parte e troca 'e' por 'ou' (e vice-versa).",
+    expl: "A pegadinha clássica é negar 'e' mantendo 'e'. Lembre: negação de conjunção vira disjunção de negações.",
+    points: ["~(p ∧ q) ≡ ~p ∨ ~q", "~(p ∨ q) ≡ ~p ∧ ~q", "Negar o condicional: p ∧ ~q"],
+    wrong: "A negação de 'p e q' é '~p e ~q'.",
   },
   {
-    id: "rlm-3", subjectId: "rlm", topic: "Lógica de argumentação", inc: 4,
-    q: "O que torna um argumento dedutivo válido?",
-    a: "Validade: se as premissas são verdadeiras, a conclusão necessariamente também é. Não depende do conteúdo, mas da forma. Argumento com premissas verdadeiras e conclusão verdadeira ainda pode ser INVÁLIDO se a forma falhar.",
-    ce: "Um argumento válido cujas premissas são verdadeiras pode ter conclusão falsa.",
-    ceTrue: false,
-    expl: "Essa é exatamente a definição de validade: premissas V + forma válida ⇒ conclusão necessariamente V.",
-    wrong: "Confundir validade (forma) com verdade (conteúdo) — a banca mistura os conceitos.",
-    points: [
-      "Válido = impossível premissas V e conclusão F.",
-      "Sólido = válido + premissas de fato verdadeiras.",
-      "Falácia formal comum: afirmar o consequente (A→B, B ∴ A) — inválido.",
-    ],
-  },
-  {
-    id: "rlm-4", subjectId: "rlm", topic: "Análise combinatória", inc: 4,
-    q: "Quando usar arranjo e quando usar combinação?",
-    a: "A ordem dos elementos importa → arranjo: A(n,p) = n!/(n−p)!. A ordem não importa → combinação: C(n,p) = n!/[p!(n−p)!].",
-    ce: "O número de comissões de 3 pessoas escolhidas entre 10 é calculado por combinação, pois a ordem de escolha não importa.",
-    ceTrue: true,
-    expl: "Comissão {A,B,C} é a mesma que {C,B,A} — ordem irrelevante ⇒ C(10,3) = 120.",
-    wrong: "Usar arranjo em comissões/equipes, multiplicando o resultado por 3!.",
-    points: [
-      "Ordem importa (funções, pódios, senhas) → arranjo.",
-      "Ordem não importa (comissões, grupos, sorteios) → combinação.",
-      "C(n,p) = A(n,p) ÷ p! — a diferença é exatamente a permutação interna.",
-    ],
+    id: "rlm3", subjectId: "rlm", topicId: "rlm-6", inc: 4,
+    q: "Combinação não considera a ordem dos elementos; arranjo, sim.",
+    a: "C(n,k) = n!/(k!(n−k)!) para grupos sem ordem. A(n,k) = n!/(n−k)! quando a ordem importa.",
+    expl: "Se trocar a ordem dos escolhidos gera um resultado diferente, é arranjo; se gera o mesmo grupo, é combinação.",
+    points: ["Combinação: ordem não importa", "Arranjo: ordem importa", "C(n,k) divide A(n,k) por k!"],
+    wrong: "Para formar uma comissão de 3 pessoas entre 10, usa-se arranjo, pois as pessoas são distintas.",
   },
 
-  /* ---------- INFORMÁTICA ---------- */
+  /* ---------- Informática ---------- */
   {
-    id: "inf-1", subjectId: "inf", topic: "Segurança: malware e phishing", inc: 5,
-    q: "Qual a diferença entre vírus, worm e cavalo de Troia?",
-    a: "Vírus precisa de um arquivo hospedeiro e da ação do usuário para se propagar. Worm se replica sozinho pela rede, sem hospedeiro. Cavalo de Troia (trojan) se disfarça de programa legítimo e não se replica.",
-    ce: "Um worm necessita de um arquivo executável hospedeiro para se propagar entre computadores.",
-    ceTrue: false,
-    expl: "Quem precisa de hospedeiro é o vírus. O worm se propaga autonomamente explorando a rede.",
-    wrong: "Inverter os conceitos de vírus e worm — a banca ama essa troca.",
-    points: [
-      "Vírus: parasita de arquivo, depende de execução. Worm: autônomo, rede.",
-      "Trojan: disfarce, não se replica; abre portas (backdoor).",
-      "Phishing: engenharia social por e-mail/site falso para roubar credenciais.",
-    ],
+    id: "inf1", subjectId: "inf", topicId: "inf-4", inc: 5,
+    q: "Phishing é uma técnica de engenharia social que usa mensagens falsas para obter dados da vítima.",
+    a: "No phishing, o atacante se passa por instituição confiável (banco, órgão) por e-mail/SMS para roubar credenciais. Não é vírus: depende da ação da vítima.",
+    expl: "A banca distingue phishing (fraude por mensagem) de malware (código malicioso). Phishing é golpe, não programa.",
+    points: ["Phishing = engenharia social por mensagem", "Depende da ação da vítima, não é vírus", "Sinais: remetente estranho, link suspeito, urgência"],
+    wrong: "Phishing é um tipo de vírus que se replica automaticamente e infecta o sistema operacional.",
   },
   {
-    id: "inf-2", subjectId: "inf", topic: "Planilhas (fórmulas)", inc: 4,
-    q: "O que fazem SOMA, MÉDIA, SE e PROCV no Excel/Calc?",
-    a: "SOMA(A1:A10) totaliza o intervalo. MÉDIA calcula a média aritmética. SE(condição; valor_V; valor_F) testa uma condição. PROCV(valor; matriz; nº_coluna; 0) busca um valor na primeira coluna e retorna dado de outra coluna (0 = exato).",
-    ce: "A função PROCV permite localizar um valor na primeira coluna de uma tabela e retornar um dado correspondente de outra coluna.",
-    ceTrue: true,
-    expl: "Essa é a definição exata da busca vertical (PROCV/VLOOKUP).",
-    wrong: "Dizer que PROCV busca em qualquer coluna — ela só busca na primeira coluna da matriz.",
-    points: [
-      "Intervalos com ':' (A1:A10); argumentos separados por ';' no Excel pt-BR.",
-      "SE aninhado permite múltiplas condições; hoje prefere-se SES (IFS).",
-      "Referência absoluta com '$' (trava linha/coluna ao arrastar).",
-    ],
+    id: "inf2", subjectId: "inf", topicId: "inf-5", inc: 4,
+    q: "Um firewall filtra o tráfego de rede com base em regras de segurança, podendo bloquear conexões indesejadas.",
+    a: "Firewall atua como barreira entre redes (ex.: interna e internet), aplicando regras para permitir ou bloquear pacotes. Não elimina vírus por si só.",
+    expl: "Cobra-se a diferença: firewall filtra tráfego; antivírus detecta malware; backup cópia de segurança.",
+    points: ["Firewall filtra tráfego por regras", "Atua entre redes (interna/externa)", "Não substitui antivírus nem backup"],
+    wrong: "O firewall elimina vírus e malwares já instalados no computador, limpando o sistema.",
   },
   {
-    id: "inf-3", subjectId: "inf", topic: "Nuvem e backup", inc: 3,
-    q: "O que diferencia SaaS, PaaS e IaaS?",
-    a: "IaaS: infraestrutura (servidores, rede) — ex.: AWS EC2. PaaS: plataforma para desenvolver — ex.: App Engine. SaaS: software pronto para uso — ex.: Gmail, Office 365. Quanto mais alto na pilha, menos o usuário gerencia.",
-    ce: "No modelo SaaS, o usuário final gerencia o sistema operacional e a infraestrutura subjacente da aplicação.",
-    ceTrue: false,
-    expl: "No SaaS o provedor gerencia tudo; o usuário apenas consome o software. Gerenciar infra é papel do modelo IaaS.",
-    wrong: "Afirmar que 'na nuvem o usuário sempre controla o SO' — só vale para IaaS.",
-    points: [
-      "IaaS → você gerencia SO e apps. PaaS → você gerencia só apps. SaaS → nada.",
-      "Backup 3-2-1: 3 cópias, 2 mídias diferentes, 1 fora do local.",
-      "Nuvem pública × privada × híbrida refere-se a quem opera a infraestrutura.",
-    ],
-  },
-  {
-    id: "inf-4", subjectId: "inf", topic: "Atalhos e sistemas", inc: 3,
-    q: "Quais atalhos de teclado são mais cobrados em prova?",
-    a: "Ctrl+C/V/X (copiar/colar/recortar), Ctrl+Z (desfazer), Ctrl+A (selecionar tudo), Ctrl+F (localizar), Alt+Tab (alternar janelas), Win+L (bloquear), Ctrl+Shift+Esc (Gerenciador de Tarefas direto).",
-    ce: "No Windows, o atalho Win+L bloqueia a estação de trabalho imediatamente.",
-    ceTrue: true,
-    expl: "Win+L = lock (bloquear sessão). Muito cobrado em questões de segurança do usuário.",
-    wrong: "Confundir Win+L com Ctrl+Alt+Del (que abre a tela de segurança, não bloqueia direto).",
-    points: [
-      "Win+L bloqueia; Ctrl+Alt+Del abre opções de segurança.",
-      "Ctrl+Shift+Esc abre o Gerenciador de Tarefas sem tela intermediária.",
-      "Navegadores: Ctrl+T (nova aba), Ctrl+W (fechar aba), Ctrl+Shift+T (reabrir).",
-    ],
+    id: "inf3", subjectId: "inf", topicId: "inf-7", inc: 3,
+    q: "O sistema operacional gerencia recursos de hardware e fornece uma interface para os programas.",
+    a: "SO (Windows, Linux) controla processador, memória, dispositivos e arquivos, permitindo que aplicativos rodem sem gerenciar o hardware diretamente.",
+    expl: "Funções cobradas: gerenciamento de processos, memória, arquivos e dispositivos; interface usuário/programa.",
+    points: ["SO gerencia hardware e recursos", "Fornece interface para aplicativos", "Exemplos: Windows, Linux, macOS"],
+    wrong: "O sistema operacional é um aplicativo de escritório usado para editar textos e planilhas.",
   },
 
-  /* ---------- DIREITO CONSTITUCIONAL ---------- */
+  /* ---------- Direito Constitucional ---------- */
   {
-    id: "dcn-1", subjectId: "dcn", topic: "Direitos fundamentais (art. 5º)", inc: 5,
-    q: "Quais são as características dos direitos e garantias fundamentais?",
-    a: "São universais, irrenunciáveis, inalienáveis, imprescritíveis, relativos (não absolutos) e de aplicabilidade imediata (§1º do art. 5º). Podem colidir entre si, resolvida por ponderação.",
-    ce: "Os direitos e garantias fundamentais previstos na CF/88 têm aplicabilidade imediata.",
-    ceTrue: true,
-    expl: "Art. 5º, §1º, CF/88: 'As normas definidoras dos direitos e garantias fundamentais têm aplicação imediata'.",
-    wrong: "Afirmar que dependem todos de regulamentação para valer — o §1º diz o contrário (embora haja normas de eficácia limitada).",
-    points: [
-      "Art. 5º, §1º: aplicação imediata das normas de direitos fundamentais.",
-      "Relatividade: nenhum direito é absoluto (nem a vida, ex.: guerra declarada).",
-      "Habeas corpus e habeas data são gratuitos; mandado de segurança protege direito líquido e certo.",
-    ],
+    id: "dcn1", subjectId: "dcn", topicId: "dcn-2", inc: 5,
+    q: "Os direitos e garantias fundamentais têm aplicabilidade imediata, nos termos do art. 5º, §1º, da CF/88.",
+    a: "O §1º do art. 5º estabelece que as normas definidoras de direitos e garantias fundamentais têm aplicação imediata, embora parte da doutrina pondere a eficácia de cada norma.",
+    expl: "Cai sempre a literalidade do §1º. A banca também cobra quais direitos são cláusulas pétreas (art. 60, §4º, IV).",
+    points: ["Art. 5º, §1º: aplicabilidade imediata", "Direitos fundamentais são cláusulas pétreas", "Não são absolutos: comportam relativização"],
+    wrong: "Os direitos fundamentais são absolutos e não admitem qualquer restrição, nem por lei.",
   },
   {
-    id: "dcn-2", subjectId: "dcn", topic: "Separação de Poderes", inc: 5,
-    q: "A separação de Poderes pode ser abolida por emenda?",
-    a: "Não. É cláusula pétrea (art. 60, §4º, III). O sistema adota freios e contrapesos: o Legislativo julga o Presidente por crime de responsabilidade, o Judiciário controla a constitucionalidade, o Executivo veta e nomeia ministros.",
-    ce: "Proposta de emenda tendente a abolir a separação dos Poderes não pode ser objeto de deliberação.",
-    ceTrue: true,
-    expl: "Art. 60, §4º, III, CF/88 — cláusula pétrea. A PEC seria rejeitada liminarmente.",
-    wrong: "Dizer que cláusulas pétreas não podem ser 'modificadas' — podem ser aprimoradas, desde que não tendam a abolir.",
-    points: [
-      "Cláusulas pétreas: forma federativa, voto direto/secreto/universal/periódico, separação de Poderes, direitos e garantias individuais.",
-      "Sistema de freios e contrapesos (checks and balances).",
-      "Judiciário: função atípica de administrar e legislar (regimentos internos).",
-    ],
+    id: "dcn2", subjectId: "dcn", topicId: "dcn-5", inc: 5,
+    q: "A segurança pública é dever do Estado, direito e responsabilidade de todos, exercida pelas polícias e guardas municipais.",
+    a: "Art. 144 da CF/88: a segurança pública é exercida pela PF, PRF, PFF, polícias civis, polícias militares e corpos de bombeiros, além das guardas municipais.",
+    expl: "A banca lista os órgãos e pede para marcar o que NÃO integra o rol (ex.: incluir Forças Armadas como órgão de segurança pública).",
+    points: ["Art. 144: rol taxativo de órgãos", "Guardas municipais protegem bens, serviços e instalações", "Forças Armadas não são órgão de segurança pública do art. 144"],
+    wrong: "As Forças Armadas integram o rol de órgãos responsáveis pela segurança pública previsto no art. 144.",
   },
   {
-    id: "dcn-3", subjectId: "dcn", topic: "Remédios constitucionais", inc: 4,
-    q: "Para que serve cada remédio constitucional?",
-    a: "Habeas corpus: liberdade de locomoção. Habeas data: acesso/retificação de dados pessoais. Mandado de segurança: direito líquido e certo. Mandado de injunção: norma regulamentadora faltante. Ação popular: moralidade administrativa (qualquer cidadão).",
-    ce: "O habeas data é o remédio adequado para proteger a liberdade de locomoção ameaçada por ilegalidade.",
-    ceTrue: false,
-    expl: "Liberdade de locomoção é protegida por habeas corpus. Habeas data trata de dados pessoais em registros públicos.",
-    wrong: "Trocar os objetos dos remédios — a banca embaralha HC, HD e MS na mesma questão.",
-    points: [
-      "HC (locomoção) e HD (dados) são gratuitos e podem ser impetrados por qualquer pessoa.",
-      "MS exige direito líquido e certo, não amparado por HC nem HD.",
-      "Ação popular: legitimidade de qualquer CIDADÃO (não de pessoa jurídica).",
-    ],
+    id: "dcn3", subjectId: "dcn", topicId: "dcn-1", inc: 4,
+    q: "A dignidade da pessoa humana é um dos fundamentos da República Federativa do Brasil.",
+    a: "Art. 1º, III, da CF/88: fundamentos — soberania, cidadania, dignidade da pessoa humana, valores sociais do trabalho e da livre iniciativa, pluralismo político.",
+    expl: "Memorize o mnemônico SO-CI-DI-VA-PLU (fundamentos). Objetivos fundamentais (art. 3º) e princípios das relações internacionais (art. 4º) são cobrados em paralelo.",
+    points: ["Fundamentos: art. 1º (SO-CI-DI-VA-PLU)", "Objetivos: art. 3º (verbos)", "Princípios internacionais: art. 4º"],
+    wrong: "A dignidade da pessoa humana é um objetivo fundamental da República, previsto no art. 3º da CF/88.",
   },
 
-  /* ---------- DIREITO ADMINISTRATIVO ---------- */
+  /* ---------- Direito Administrativo ---------- */
   {
-    id: "dad-1", subjectId: "dad", topic: "Atos administrativos", inc: 5,
-    q: "Quais são os atributos e elementos do ato administrativo?",
-    a: "Atributos (PAT): presunção de legitimidade/veracidade, autoexecutoriedade e tipicidade — mais a imperatividade. Elementos/requisitos (COMIFIFO): competência, finalidade, forma, motivo e objeto.",
-    ce: "A presunção de legitimidade é atributo que inverte o ônus da prova, cabendo ao particular demonstrar a ilegitimidade do ato.",
-    ceTrue: true,
-    expl: "O ato presume-se legítimo até prova em contrário — presunção relativa (juris tantum).",
-    wrong: "Tratar a presunção como absoluta (jure et de jure) — ela admite prova em contrário.",
-    points: [
-      "Atributos: presunção de legitimidade, imperatividade, autoexecutoriedade, tipicidade.",
-      "Anulação = vício de legalidade (efeito ex tunc); revogação = mérito/conveniência (efeito ex nunc).",
-      "Atributos não se confundem com elementos (competência, finalidade, forma, motivo, objeto).",
-    ],
+    id: "dad1", subjectId: "dad", topicId: "dad-3", inc: 5,
+    q: "O ato administrativo pode ser anulado por ilegalidade ou revogado por conveniência e oportunidade.",
+    a: "Anulação = vício de legalidade (efeito ex tunc). Revogação = mérito administrativo, conveniência/oportunidade (efeito ex nunc). Súmula 473 do STF.",
+    expl: "A banca inverte os conceitos ou os efeitos. Anulação atinge ato ilegal; revogação, ato válido mas inoportuno.",
+    points: ["Anulação: ilegalidade, ex tunc", "Revogação: conveniência/oportunidade, ex nunc", "Súmula 473/STF"],
+    wrong: "A revogação do ato administrativo produz efeitos retroativos (ex tunc), alcançando seus efeitos passados.",
   },
   {
-    id: "dad-2", subjectId: "dad", topic: "Licitações (Lei 14.133/21)", inc: 5,
-    q: "Quais são as modalidades de licitação na Lei 14.133/2021?",
-    a: "Pregão, concorrência, concurso, leilão e diálogo competitivo. A lei extinguiu tomada de preços e convite (da antiga 8.666/93) e o RDC. Pregão é obrigatório para bens e serviços comuns.",
-    ce: "A Lei 14.133/2021 prevê como modalidades de licitação o pregão, a concorrência, o concurso, o leilão e o diálogo competitivo.",
-    ceTrue: true,
-    expl: "Art. 28 da Lei 14.133/21 — são exatamente essas cinco modalidades.",
-    wrong: "Incluir 'tomada de preços' ou 'convite' na lista — modalidades extintas.",
-    points: [
-      "5 modalidades: pregão, concorrência, concurso, leilão, diálogo competitivo.",
-      "Pregão: bens/serviços comuns, sempre menor preço ou maior desconto.",
-      "Extintas: convite, tomada de preços, RDC.",
-    ],
+    id: "dad2", subjectId: "dad", topicId: "dad-1", inc: 5,
+    q: "O princípio da impessoalidade veda a promoção pessoal do agente em atos e publicidades oficiais.",
+    a: "A impessoalidade tem dupla face: atuação sem favoritismo/perseguição e vedação à promoção pessoal (art. 37, §1º).",
+    expl: "Cobra-se o art. 37, §1º: publicidade de atos não pode ter nomes/símbolos que caracterizem promoção pessoal.",
+    points: ["Impessoalidade = sem favoritismo nem promoção pessoal", "Art. 37, §1º: publicidade impessoal", "LIMPE: legalidade, impessoalidade, moralidade, publicidade, eficiência"],
+    wrong: "O princípio da moralidade exige que a administração atue de forma impessoal, sem qualquer distinção entre os administrados.",
   },
   {
-    id: "dad-3", subjectId: "dad", topic: "Improbidade (Lei 8.429/92)", inc: 4,
-    q: "A improbidade administrativa admite modalidade culposa?",
-    a: "Não. Após a Lei 14.230/2021, exige-se DOLO específico para todas as condutas de improbidade (arts. 9, 10 e 11). A mera culpa não configura improbidade, sem prejuízo de outras responsabilidades.",
-    ce: "Após a Lei 14.230/2021, a improbidade por dano ao erário (art. 10) admite punição na modalidade culposa.",
-    ceTrue: false,
-    expl: "A reforma de 2021 eliminou a modalidade culposa: todas as hipóteses exigem dolo específico.",
-    wrong: "Aplicar a redação antiga da lei, que previa culpa no art. 10 — pegadinha temporal clássica.",
-    points: [
-      "Lei 14.230/21: apenas DOLO específico; culpa não basta.",
-      "Retroatividade da lei mais benéfica alcança atos anteriores (STF, Tema 1.199).",
-      "Sanções: perda da função, suspensão de direitos políticos, multa, proibição de contratar.",
-    ],
+    id: "dad3", subjectId: "dad", topicId: "dad-5", inc: 4,
+    q: "A Lei 14.133/2021 (Nova Lei de Licitações) prevê a dispensa e a inexigibilidade como hipóteses de contratação direta.",
+    a: "Contratação direta ocorre por licitação dispensada, dispensável ou inexigível. Inexigibilidade = inviabilidade de competição (art. 74).",
+    expl: "A banca distingue dispensa (rol taxativo, competição possível) de inexigibilidade (competição inviável).",
+    points: ["Inexigibilidade: inviabilidade de competição", "Dispensa: hipóteses taxativas da lei", "Lei 14.133/2021 substituiu a 8.666/93"],
+    wrong: "A inexigibilidade de licitação ocorre quando há possibilidade de competição, mas a lei autoriza a dispensa do certame.",
   },
 ];
 
-/* ---------- seletores da base calibrada ---------- */
+/* ---------- metadados de formato ---------- */
+export const MODE_META = {
+  flashcards: { label: "Flashcards", desc: "Pergunta/resposta para memorização ativa, com avaliação de domínio." },
+  quiz: { label: "Questões C/E", desc: "Itens Certo/Errado no estilo Cebraspe, com gabarito comentado." },
+  resumo: { label: "Resumo", desc: "Pontos-chave priorizados por incidência + a pegadinha da banca." },
+} as const;
 
-export const filterItems = (subjectId: string, topic?: string): AiItem[] =>
-  AI_BANK.filter((i) => i.subjectId === subjectId && (!topic || i.topic === topic))
-    .sort((a, b) => b.inc - a.inc);
-
-export const topicsOf = (subjectId: string): string[] =>
-  [...new Set(AI_BANK.filter((i) => i.subjectId === subjectId).map((i) => i.topic))];
-
-export const MODE_META: Record<AiMode, { label: string; desc: string }> = {
-  flashcards: { label: "Flashcards", desc: "10 cards de memorização ativa, priorizados por incidência." },
-  quiz: { label: "Questões C/E", desc: "8 assertivas estilo Cebraspe com gabarito comentado." },
-  resumo: { label: "Resumo estratégico", desc: "Síntese por tópico com pegadinhas sinalizadas." },
+export const topicLabel = (id: string | undefined): string => {
+  if (!id) return "Geral";
+  const map: Record<string, string> = {};
+  const T: Record<string, string[]> = {
+    por: ["Compreensão e interpretação", "Coesão e coerência", "Ortografia", "Acentuação", "Classes de palavras", "Concordância", "Regência", "Crase", "Pontuação", "Sintaxe", "Semântica", "Redação oficial"],
+    rlm: ["Proposições", "Tabela-verdade", "Equivalências e negações", "Argumentos", "Lógica de 1ª ordem", "Análise combinatória", "Probabilidade", "Sequências"],
+    inf: ["Internet e intranet", "Navegadores", "Correio eletrônico", "Segurança da informação", "Malwares", "Backup", "Sistemas operacionais", "Pacote de escritório"],
+    dcn: ["Princípios fundamentais", "Direitos fundamentais", "Direitos sociais", "Nacionalidade", "Organização do Estado", "Administração pública", "Poder Legislativo", "Poder Executivo", "Poder Judiciário", "Segurança pública"],
+    dad: ["Princípios da administração", "Organização administrativa", "Atos administrativos", "Poderes administrativos", "Licitações", "Servidores públicos", "Responsabilidade do Estado", "Improbidade", "Controle da administração"],
+  };
+  const [sub, n] = id.split("-");
+  const arr = T[sub];
+  const idx = parseInt(n, 10) - 1;
+  return arr && arr[idx] ? arr[idx] : map[id] ?? id;
 };
+
+/* ---------- seletores ---------- */
+export const filterItems = (subjectId: string, topic?: string): AiItem[] =>
+  AI_BANK.filter((i) => i.subjectId === subjectId && (!topic || i.topicId === topic));
+
+/* ---------- módulo 09 · Materiais ---------- */
+export const ytSearch = (query: string) =>
+  `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+
+export const VIDEO_CHANNELS = [
+  { subjectId: "por", channel: "Professor Noslen", url: "https://www.youtube.com/results?search_query=professor+noslen" },
+  { subjectId: "rlm", channel: "Matemática pra Passar", url: "https://www.youtube.com/results?search_query=raciocinio+logico+concurso" },
+  { subjectId: "inf", channel: "Informática p/ Concursos", url: "https://www.youtube.com/results?search_query=informatica+para+concursos" },
+  { subjectId: "dcn", channel: "Direito Constitucional", url: "https://www.youtube.com/results?search_query=direito+constitucional+concurso" },
+  { subjectId: "dad", channel: "Direito Administrativo", url: "https://www.youtube.com/results?search_query=direito+administrativo+concurso" },
+];
+
+export const QUESTION_SITES = [
+  { name: "Questionei", url: "https://questionei.com/", tag: "Grátis" },
+  { name: "PCI Concursos", url: "https://www.pciconcursos.com.br/provas/", tag: "Provas + Gabaritos" },
+  { name: "Estude Grátis", url: "https://www.estudegratis.com.br", tag: "Grátis" },
+  { name: "Gran Cursos Questões", url: "https://questoes.grancursosonline.com.br/", tag: "Freemium" },
+  { name: "TEC Concursos", url: "https://www.tecconcursos.com.br", tag: "Freemium" },
+  { name: "Qconcursos", url: "https://www.qconcursos.com", tag: "Freemium" },
+];
