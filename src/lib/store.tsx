@@ -77,10 +77,10 @@ interface Store {
 
 const Ctx = createContext<Store | null>(null);
 
-function load(): AppState {
+function load(storageKey: string): AppState {
   const fresh = buildSeed();
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(storageKey);
     if (raw) {
       const parsed = JSON.parse(raw);
       const merged: AppState =
@@ -99,8 +99,8 @@ function load(): AppState {
   return fresh;
 }
 
-export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AppState>(load);
+export function StoreProvider({ children, storageKey = KEY }: { children: ReactNode; storageKey?: string }) {
+  const [state, setState] = useState<AppState>(() => load(storageKey));
   const [tab, setTab] = useState<TabId>("inicio");
   const [editalFilter, setEditalFilter] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -108,11 +108,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(KEY, JSON.stringify(state));
+      localStorage.setItem(storageKey, JSON.stringify(state));
     } catch {
       /* quota */
     }
-  }, [state]);
+  }, [state, storageKey]);
 
   const notify = useCallback((msg: string, tone: Toast["tone"] = "green") => {
     const id = ++tid.current;

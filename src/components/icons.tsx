@@ -113,3 +113,27 @@ export const IcTrash = (p: P) => (
 export const IcLayers = (p: P) => (
   <svg {...base(p)}><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 13 9 5 9-5" /></svg>
 );
+export const IcLogOut = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M9 21H5.5A1.5 1.5 0 0 1 4 19.5v-15A1.5 1.5 0 0 1 5.5 3H9" />
+    <path d="M15 16.5 19.5 12 15 7.5M19.5 12H9" />
+  </svg>
+);
+export const IcCrown = (p: P) => (
+  <svg {...base(p)}>
+    <path d="m3 7 4.5 4L12 4l4.5 7L21 7l-1.5 11.5h-15L3 7Z" />
+    <path d="M6 21.5h12" />
+  </svg>
+);
+export const IcCardIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="2.5" y="5" width="19" height="14" rx="2" />
+    <path d="M2.5 9.5h19M6 15h4" />
+  </svg>
+);
+export const IcUser = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4.5 20.5c1.2-3.5 4-5 7.5-5s6.3 1.5 7.5 5" />
+  </svg>
+);

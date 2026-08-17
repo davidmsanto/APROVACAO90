@@ -1,16 +1,30 @@
-import { useEffect, type ComponentType, type SVGProps } from "react";
+import { useEffect, useState, type ComponentType, type SVGProps } from "react";
 import { StoreProvider, useStore, type TabId } from "./lib/store";
 import { PHASES } from "./lib/types";
 import { Brand } from "./components/Brand";
 import { Dot } from "./components/ui";
+import AuthScreen from "./components/AuthScreen";
+import Paywall from "./components/Paywall";
+import {
+  dataKeyFor,
+  fmtCountdown,
+  getSessionUser,
+  logout,
+  TRIAL_MS,
+  usePlanClock,
+  type PlanStatus,
+  type UserRecord,
+} from "./lib/auth";
 import {
   IcBolt,
   IcCalendar,
   IcCards,
+  IcCrown,
   IcFlag,
   IcGear,
   IcGrid,
   IcList,
+  IcLogOut,
   IcPlay,
   IcRefresh,
   IcSpark,
@@ -47,7 +61,81 @@ const NAV_INTEL: NavItem[] = [
   { id: "simulados", n: "11", label: "Simulados", icon: IcCards },
 ];
 
-function Sidebar() {
+/* ============ selo do modo teste / PRO ============ */
+
+function trialColor(ms: number) {
+  return ms > 6 * 3600_000 ? "#00ff68" : ms > 3600_000 ? "#f5b84b" : "#f0655f";
+}
+
+function TrialBadge({ status, onUpgrade }: { status: PlanStatus; onUpgrade: () => void }) {
+  if (status.kind === "pro") {
+    return (
+      <span className="flex items-center gap-1.5 rounded-full border border-[rgba(0,255,104,0.4)] bg-[rgba(0,255,104,0.1)] px-3 py-1.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-brand2 shadow-[0_0_16px_rgba(0,255,90,0.15)]">
+        <IcCrown size={12} /> PRO
+      </span>
+    );
+  }
+  const ms = status.kind === "trial" ? status.msLeft : 0;
+  const color = trialColor(ms);
+  const consumed = Math.min(100, ((TRIAL_MS - ms) / TRIAL_MS) * 100);
+  return (
+    <div className="group relative">
+      <button
+        className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11.5px] transition-all hover:-translate-y-0.5"
+        style={{ borderColor: `${color}55`, background: `${color}12` }}
+      >
+        <span className="pulse-g h-1.5 w-1.5 rounded-full" style={{ background: color, boxShadow: `0 0 8px ${color}` }} />
+        <span className="kicker !text-[8.5px]" style={{ color }}>teste</span>
+        <span className="num font-semibold" style={{ color }}>{fmtCountdown(ms)}</span>
+      </button>
+      <div className="pointer-events-none absolute right-0 top-full z-40 mt-2 w-[290px] translate-y-1 rounded-xl border border-[rgba(0,255,104,0.25)] bg-[#061a0f] p-4 opacity-0 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.9)] backdrop-blur transition-all duration-200 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100">
+        <div className="flex items-center justify-between">
+          <span className="kicker">[ modo teste · 24h ]</span>
+          <span className="num text-[11px]" style={{ color }}>{fmtCountdown(ms)}</span>
+        </div>
+        <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-raise">
+          <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${consumed}%`, background: color, boxShadow: `0 0 10px ${color}` }} />
+        </div>
+        <div className="mt-1.5 flex justify-between text-[10px] text-mist">
+          <span className="num">{Math.round(consumed)}% usado</span>
+          <span>depois: painel trava</span>
+        </div>
+        <p className="mt-2.5 text-[11.5px] leading-relaxed text-fog">
+          Acesso total sem assinatura. Quando o relógio zerar, só o plano mensal reabre o painel.
+        </p>
+        <button onClick={onUpgrade} className="btn mt-3 w-full !py-2 !text-[9.5px]">
+          <IcCrown size={12} /> Assinar PRO — R$ 29,90/mês
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AccountBlock({ user, status, onLogout }: { user: UserRecord; status: PlanStatus; onLogout: () => void }) {
+  const initial = user.name.trim().charAt(0).toUpperCase() || "?";
+  return (
+    <div className="mb-3 flex items-center gap-2.5 rounded-xl border border-[rgba(0,255,104,0.12)] bg-[#061a0f] p-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[rgba(0,255,104,0.3)] bg-[rgba(0,255,104,0.08)] font-display text-[15px] font-semibold text-brand2">
+        {initial}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[12.5px] font-semibold text-snow">{user.name}</div>
+        <div className="truncate text-[9.5px] text-mist">
+          {status.kind === "pro" ? "plano PRO ativo" : user.email}
+        </div>
+      </div>
+      <button
+        onClick={onLogout}
+        title="Sair da conta"
+        className="rounded-full border border-transparent p-1.5 text-mist transition-all hover:border-[rgba(240,101,95,0.4)] hover:bg-[rgba(240,101,95,0.08)] hover:text-[#f0655f]"
+      >
+        <IcLogOut size={14} />
+      </button>
+    </div>
+  );
+}
+
+function Sidebar({ user, status, onLogout }: { user: UserRecord; status: PlanStatus; onLogout: () => void }) {
   const { tab, setTab, stats, state } = useStore();
   const phase = PHASES[stats.phaseIndex];
   const reviewBadge = stats.dueToday + stats.overdue;
@@ -88,6 +176,7 @@ function Sidebar() {
         {NAV_INTEL.map((it) => item(it, true))}
       </nav>
       <div className="border-t border-[rgba(0,255,104,0.1)] p-4">
+        <AccountBlock user={user} status={status} onLogout={onLogout} />
         <div className="rounded-xl border border-[rgba(0,255,104,0.12)] bg-[#061a0f] p-3.5">
           <div className="flex items-center gap-2">
             <Dot color={phase.color} pulse size={8} />
@@ -104,14 +193,33 @@ function Sidebar() {
   );
 }
 
-function MobileNav() {
+function MobileNav({ status, onUpgrade }: { status: PlanStatus; onUpgrade: () => void }) {
   const { tab, setTab, stats } = useStore();
+  const ms = status.kind === "trial" ? status.msLeft : 0;
+  const color = trialColor(ms);
   return (
     <div className="sticky top-0 z-30 border-b border-[rgba(0,255,104,0.1)] bg-[#020b06]/90 backdrop-blur-md lg:hidden">
       <div className="flex items-center justify-between px-4 py-3">
         <Brand size={36} />
-        <div className="num rounded-full border border-[rgba(0,255,104,0.4)] bg-[rgba(0,255,104,0.1)] px-2.5 py-1 text-[13px] font-semibold text-brand2">
-          D-{stats.daysLeft}
+        <div className="flex items-center gap-2">
+          {status.kind === "pro" ? (
+            <span className="flex items-center gap-1 rounded-full border border-[rgba(0,255,104,0.4)] bg-[rgba(0,255,104,0.1)] px-2.5 py-1 text-[11px] font-bold text-brand2">
+              <IcCrown size={11} /> PRO
+            </span>
+          ) : (
+            <button
+              onClick={onUpgrade}
+              className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] transition-transform active:scale-95"
+              style={{ borderColor: `${color}55`, background: `${color}12`, color }}
+              title="Modo teste — toque para assinar"
+            >
+              <span className="pulse-g h-1.5 w-1.5 rounded-full" style={{ background: color }} />
+              <span className="num font-semibold">{fmtCountdown(ms)}</span>
+            </button>
+          )}
+          <div className="num rounded-full border border-[rgba(0,255,104,0.4)] bg-[rgba(0,255,104,0.1)] px-2.5 py-1 text-[13px] font-semibold text-brand2">
+            D-{stats.daysLeft}
+          </div>
         </div>
       </div>
       <div className="flex gap-1 overflow-x-auto px-3 pb-2.5">
@@ -140,7 +248,7 @@ function MobileNav() {
   );
 }
 
-function TopBar() {
+function TopBar({ status, onUpgrade }: { status: PlanStatus; onUpgrade: () => void }) {
   const { state, stats } = useStore();
   return (
     <div className="mb-7 flex flex-wrap items-center gap-2.5">
@@ -154,11 +262,14 @@ function TopBar() {
           <span className="font-semibold text-snow">{v}</span>
         </span>
       ))}
-      <span className="ml-auto flex items-center gap-2 rounded-full border border-[rgba(0,255,104,0.12)] bg-[#04140a] px-3 py-1.5 text-[11.5px]">
+      <span className="flex items-center gap-2 rounded-full border border-[rgba(0,255,104,0.12)] bg-[#04140a] px-3 py-1.5 text-[11.5px]">
         <Dot color={stats.indexBand.color} size={7} />
         <span className="kicker !text-[9px]">ÍNDICE</span>
         <span className="num font-semibold" style={{ color: stats.indexBand.color }}>{stats.indexScore}/100</span>
       </span>
+      <div className="ml-auto">
+        <TrialBadge status={status} onUpgrade={onUpgrade} />
+      </div>
     </div>
   );
 }
@@ -187,7 +298,17 @@ function Toasts() {
   );
 }
 
-function Shell() {
+function Shell({
+  user,
+  status,
+  onLogout,
+  onUpgrade,
+}: {
+  user: UserRecord;
+  status: PlanStatus;
+  onLogout: () => void;
+  onUpgrade: () => void;
+}) {
   const { tab } = useStore();
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -208,16 +329,11 @@ function Shell() {
   const View = views[tab];
   return (
     <div className="relative min-h-full">
-      <div className="bg-scene" />
-      <div className="bg-grid" />
-      <div className="bg-noise" />
-      <div className="glow-drift glow-a" />
-      <div className="glow-drift glow-b" />
-      <Sidebar />
-      <MobileNav />
+      <Sidebar user={user} status={status} onLogout={onLogout} />
+      <MobileNav status={status} onUpgrade={onUpgrade} />
       <main className="relative z-10 lg:pl-[228px]">
         <div className="mx-auto max-w-[1240px] px-4 py-6 sm:px-6 lg:py-8">
-          <div className="hidden lg:block"><TopBar /></div>
+          <div className="hidden lg:block"><TopBar status={status} onUpgrade={onUpgrade} /></div>
           <div key={tab} className="anim-fade"><View /></div>
           <footer className="mt-12 border-t border-[rgba(0,255,104,0.1)] pt-5 pb-2 text-center text-[11px] text-mist">
             APROVAÇÃO 90 · o usuário preenche os dados, o sistema faz os cálculos.
@@ -229,10 +345,82 @@ function Shell() {
   );
 }
 
-export default function App() {
+/* ============ raiz com portão de autenticação ============ */
+
+function BgLayers() {
   return (
-    <StoreProvider>
-      <Shell />
+    <>
+      <div className="bg-scene" />
+      <div className="bg-grid" />
+      <div className="bg-noise" />
+      <div className="glow-drift glow-a" />
+      <div className="glow-drift glow-b" />
+    </>
+  );
+}
+
+function AuthedApp({ user, onUserChange }: { user: UserRecord; onUserChange: (u: UserRecord | null) => void }) {
+  const status = usePlanClock(user);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+
+  const handleUpgraded = (u: UserRecord) => {
+    setUpgradeOpen(false);
+    onUserChange(u);
+  };
+
+  /* teste expirou → paywall obrigatório (o relógio vivo detecta sozinho) */
+  if (status.kind === "expired") {
+    return (
+      <div className="relative min-h-full">
+        <BgLayers />
+        <Paywall user={user} status={status} onUpgraded={handleUpgraded} />
+      </div>
+    );
+  }
+
+  return (
+    /* key={user.id}: cada conta tem seu próprio banco local */
+    <StoreProvider key={user.id} storageKey={dataKeyFor(user.id)}>
+      <div className="relative min-h-full">
+        <BgLayers />
+        <Shell
+          user={user}
+          status={status}
+          onLogout={() => {
+            logout();
+            onUserChange(null);
+          }}
+          onUpgrade={() => setUpgradeOpen(true)}
+        />
+        {upgradeOpen && (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-[#020b06]/80 backdrop-blur-sm">
+            <div className="anim-fade min-h-full">
+              <Paywall
+                user={user}
+                status={status}
+                onUpgraded={handleUpgraded}
+                backLabel="Voltar ao painel"
+                onBack={() => setUpgradeOpen(false)}
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </StoreProvider>
   );
+}
+
+export default function App() {
+  const [user, setUser] = useState<UserRecord | null>(() => getSessionUser());
+
+  if (!user) {
+    return (
+      <div className="relative min-h-full">
+        <BgLayers />
+        <AuthScreen onAuthed={setUser} />
+      </div>
+    );
+  }
+
+  return <AuthedApp key={user.id} user={user} onUserChange={setUser} />;
 }
