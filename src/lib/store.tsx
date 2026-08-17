@@ -11,6 +11,8 @@ import type {
   AiResult,
   AppState,
   ErrorType,
+  ImportMode,
+  ImportPlanItem,
   MockPlan,
   PastExam,
   PlannerSlot,
@@ -62,6 +64,7 @@ interface Store {
   completeReview: (id: string) => void;
   setTopicStatus: (topicId: string, status: Status) => void;
   addTopic: (subjectId: string, name: string) => void;
+  applyImportPlan: (plan: ImportPlanItem[], mode: ImportMode) => number;
   togglePlanner: (dateISO: string, slot: PlannerSlot) => void;
   toggleFocus: (item: { key: string; topic: Topic; minutes: number }) => void;
   updateSettings: (s: Settings) => void;
@@ -215,6 +218,52 @@ export function StoreProvider({ children, storageKey = KEY }: { children: ReactN
     }));
   }, []);
 
+  const applyImportPlan: Store["applyImportPlan"] = useCallback((plan, mode) => {
+    const added = plan.reduce((a, p) => a + p.topics.length, 0);
+    setState((s) => {
+      const subjects = [...s.subjects];
+      const colorPool = ["#5cb3ff", "#c9a2ff", "#f0904b", "#7fd8a8", "#f5b84b", "#f0655f", "#8ad7ff", "#c9f27f"];
+      const newTopics: Topic[] = [];
+      const touched: string[] = [];
+
+      plan.forEach((item) => {
+        let sid = item.subjectId;
+        if (!sid) {
+          sid = `cs-${safeId("s")}`;
+          const nm = sanitizeText(item.subjectName ?? "Nova disciplina", 50) || "Nova disciplina";
+          subjects.push({
+            id: sid,
+            name: nm,
+            short: nm.replace(/[^a-zA-ZÀ-ú]/g, "").slice(0, 4).toUpperCase() || "NOVA",
+            color: colorPool[subjects.length % colorPool.length],
+            weight: 1,
+          });
+        }
+        touched.push(sid);
+        item.topics.slice(0, 200).forEach((t) => {
+          newTopics.push({
+            id: `${sid}-${safeId("t")}`,
+            subjectId: sid,
+            name: sanitizeText(t.name, 140),
+            status: "nao_iniciado",
+            importance: "media",
+            difficulty: 3,
+            questions: 0,
+            correct: 0,
+          });
+        });
+      });
+
+      const topics =
+        mode === "replace"
+          ? [...s.topics.filter((t) => !touched.includes(t.subjectId)), ...newTopics]
+          : [...s.topics, ...newTopics];
+
+      return { ...s, subjects, topics };
+    });
+    return added;
+  }, []);
+
   const togglePlanner: Store["togglePlanner"] = useCallback((dateISO, slot) => {
     setState((s) => {
       const key = `${dateISO}:${slot.id}`;
@@ -360,6 +409,7 @@ export function StoreProvider({ children, storageKey = KEY }: { children: ReactN
     completeReview,
     setTopicStatus,
     addTopic,
+    applyImportPlan,
     togglePlanner,
     toggleFocus,
     updateSettings,

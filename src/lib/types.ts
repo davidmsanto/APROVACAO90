@@ -162,6 +162,16 @@ export interface Settings {
   weights: { edital: number; questoes: number; consistencia: number; revisoes: number; metas: number };
 }
 
+/* ---------- importador de edital ---------- */
+
+export interface ImportPlanItem {
+  subjectId?: string; // mapeado para disciplina existente
+  subjectName?: string; // cria nova disciplina (quando sem subjectId)
+  topics: { name: string }[];
+}
+
+export type ImportMode = "add" | "replace";
+
 export interface AppState {
   subjects: Subject[];
   topics: Topic[];

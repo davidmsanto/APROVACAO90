@@ -62,6 +62,18 @@ export const IcChevron = (p: P) => (
 export const IcPlus = (p: P) => (
   <svg {...base(p)}><path d="M12 5v14M5 12h14" /></svg>
 );
+export const IcFile = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M6 2.5h8L19 7.5V20a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 20V4A1.5 1.5 0 0 1 6.5 2.5Z" />
+    <path d="M13.5 2.5v5.5H19M9 12h6M9 16h6" />
+  </svg>
+);
+export const IcUpload = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M12 15V3m0 0L7.5 7.5M12 3l4.5 4.5" />
+    <path d="M4 15v2.5A1.5 1.5 0 0 0 5.5 19h13a1.5 1.5 0 0 0 1.5-1.5V15" />
+  </svg>
+);
 export const IcDownload = (p: P) => (
   <svg {...base(p)}><path d="M12 3v12m0 0 4.5-4.5M12 15 7.5 10.5" /><path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17" /></svg>
 );

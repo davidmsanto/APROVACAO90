@@ -4,7 +4,8 @@ import type { Status, Topic } from "../lib/types";
 import { STATUS_LIST, statusMeta } from "../lib/types";
 import { fmtNum, fmtPct } from "../lib/calc";
 import { Bar, Card, Chip, Dot, TabHeader, TextInput, Select } from "../components/ui";
-import { IcChevron, IcPlus, IcX } from "../components/icons";
+import { IcChevron, IcPlus, IcUpload, IcX } from "../components/icons";
+import ImportEdital from "../components/ImportEdital";
 
 const IMP_COLOR = { alta: "#f0655f", media: "#f5b84b", baixa: "#66716b" } as const;
 
@@ -72,6 +73,7 @@ function TopicRow({ t, delay }: { t: Topic; delay: number }) {
 
 export default function Edital() {
   const { state, stats, editalFilter, setEditalFilter, addTopic, notify } = useStore();
+  const [importing, setImporting] = useState(false);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<Status | "todos">("todos");
   const [open, setOpen] = useState<Record<string, boolean>>(() => {
@@ -107,8 +109,23 @@ export default function Edital() {
         kicker="Base de dados central"
         title="Edital verticalizado"
         desc="Disciplina → tópico → status → prioridade → progresso. Tudo aqui alimenta o Dashboard, Planejador, Revisões e o Índice A90."
-        right={<div className="num rounded-full border border-[rgba(0,255,104,0.3)] bg-[rgba(0,255,104,0.1)] px-4 py-2.5 text-[15px] font-semibold text-brand2">{stats.editalPct}% coberto</div>}
+        right={
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => setImporting(true)}
+              className="btn !px-5 !py-2.5"
+              title="Subir edital em PDF ou TXT"
+            >
+              <IcUpload size={14} /> Importar edital
+            </button>
+            <div className="num hidden rounded-full border border-[rgba(0,255,104,0.3)] bg-[rgba(0,255,104,0.1)] px-4 py-2.5 text-[15px] font-semibold text-brand2 sm:block">
+              {stats.editalPct}% coberto
+            </div>
+          </div>
+        }
       />
+
+      {importing && <ImportEdital onClose={() => setImporting(false)} />}
 
       <Card className="mb-5 flex flex-wrap items-center gap-3 p-4" delay={40}>
         <TextInput placeholder="Buscar tópico…" value={query} onChange={(e) => setQuery(e.target.value)} className="max-w-[240px]" />
