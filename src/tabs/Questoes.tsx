@@ -7,10 +7,10 @@ import { Btn, Card, Chip, Dot, Field, Select, TabHeader, TextInput, ToggleChip }
 import { IcCheck } from "../components/icons";
 
 export default function Questoes() {
-  const { state, stats, addQuestionLog, notify } = useStore();
-  const subjects = state.subjects.filter((s) => s.id !== "sim");
-  const [subjectId, setSubjectId] = useState("rlm");
-  const topics = state.topics.filter((t) => t.subjectId === subjectId);
+  const { state, stats, addQuestionLog, notify, visibleSubjects, visibleTopics } = useStore();
+  const subjects = visibleSubjects.filter((s) => s.id !== "sim");
+  const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? "");
+  const topics = visibleTopics.filter((t) => t.subjectId === subjectId);
   const [topicId, setTopicId] = useState(topics[0]?.id ?? "");
   const [total, setTotal] = useState("");
   const [correct, setCorrect] = useState("");
@@ -21,7 +21,7 @@ export default function Questoes() {
 
   const pickSubject = (id: string) => {
     setSubjectId(id);
-    setTopicId(state.topics.filter((x) => x.subjectId === id)[0]?.id ?? "");
+    setTopicId(visibleTopics.filter((x) => x.subjectId === id)[0]?.id ?? "");
   };
 
   const submit = () => {

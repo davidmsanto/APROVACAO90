@@ -6,24 +6,44 @@ import { Btn, Card, Chip, Dot, Field, Select, TabHeader, TextInput } from "../co
 import { IcCheck, IcCopy, IcExternal, IcPause, IcPlay, IcClock } from "../components/icons";
 
 export default function Materiais() {
-  const { state, addVideoSession, notify } = useStore();
-  const subjects = state.subjects.filter((s) => ["por", "rlm", "inf", "dcn", "dad"].includes(s.id));
-  const [subjectId, setSubjectId] = useState("por");
-  const topics = state.topics.filter((t) => t.subjectId === subjectId);
+  const { addVideoSession, notify, visibleSubjects, visibleTopics } = useStore();
+  const subjects = visibleSubjects.filter((s) => ["por", "rlm", "inf", "dcn", "dad"].includes(s.id));
+  const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? "por");
+  const topics = visibleTopics.filter((t) => t.subjectId === subjectId);
   const [topicId, setTopicId] = useState(topics[0]?.id ?? "");
   const [duration, setDuration] = useState(50);
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const interval = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const subject = subjects.find((s) => s.id === subjectId)!;
+  const subject = subjects.find((s) => s.id === subjectId);
   const topic = topics.find((t) => t.id === topicId);
 
   useEffect(() => {
-    setTopicId(state.topics.filter((t) => t.subjectId === subjectId)[0]?.id ?? "");
-  }, [subjectId, state.topics]);
+    setTopicId(visibleTopics.filter((t) => t.subjectId === subjectId)[0]?.id ?? "");
+  }, [subjectId, visibleTopics]);
 
   useEffect(() => () => { if (interval.current) clearInterval(interval.current); }, []);
+
+  if (!subject) {
+    return (
+      <div>
+        <TabHeader
+          index="09"
+          kicker="Conteúdo gratuito"
+          title="Materiais"
+          desc="Videoaulas gratuitas das disciplinas básicas e os melhores bancos de questões grátis."
+          right={<Chip color="#00ff68">100% gratuito</Chip>}
+        />
+        <Card className="p-10 text-center">
+          <p className="text-[13px] text-fog">
+            As disciplinas básicas (Português, RLM, Informática, D. Constitucional, D. Administrativo) não estão no edital ativo.
+            Importe um edital que as contenha ou volte ao edital padrão.
+          </p>
+        </Card>
+      </div>
+    );
+  }
 
   const start = () => {
     setRunning(true);

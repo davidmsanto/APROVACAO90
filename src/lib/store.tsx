@@ -10,6 +10,7 @@ import {
 import type {
   AiResult,
   AppState,
+  EditalInfo,
   ErrorType,
   ImportMode,
   ImportPlanItem,
@@ -20,8 +21,10 @@ import type {
   Settings,
   Status,
   StudySession,
+  Subject,
   Topic,
 } from "./types";
+import { DEFAULT_EDITAL_ID } from "./types";
 import { buildSeed, addDays, iso } from "./seed";
 import { computeStats, type Stats } from "./calc";
 import { sanitizeState, sanitizeText, clampInt, safeId } from "./security";
@@ -64,7 +67,16 @@ interface Store {
   completeReview: (id: string) => void;
   setTopicStatus: (topicId: string, status: Status) => void;
   addTopic: (subjectId: string, name: string) => void;
-  applyImportPlan: (plan: ImportPlanItem[], mode: ImportMode) => number;
+  applyImportPlan: (plan: ImportPlanItem[], mode: ImportMode, editalId: string) => number;
+
+  /* múltiplos editais */
+  editalList: EditalInfo[];
+  activeEdital: EditalInfo;
+  visibleTopics: Topic[];
+  visibleSubjects: Subject[];
+  createEdital: (name: string) => string;
+  setActiveEdital: (id: string) => void;
+  removeEdital: (id: string) => void;
   togglePlanner: (dateISO: string, slot: PlannerSlot) => void;
   toggleFocus: (item: { key: string; topic: Topic; minutes: number }) => void;
   updateSettings: (s: Settings) => void;
@@ -94,12 +106,27 @@ function load(storageKey: string): AppState {
               settings: { ...fresh.settings, ...((parsed as Partial<AppState>).settings ?? {}) },
             }
           : fresh;
-      return sanitizeState(merged, fresh);
+      const st = sanitizeState(merged, fresh);
+      return normalizeEdital(st, fresh);
     }
   } catch {
     /* payload inválido → seed */
   }
   return fresh;
+}
+
+/* garante que o estado tenha um registro de editais válido (dados antigos podem não ter) */
+function normalizeEdital(st: AppState, fresh: AppState): AppState {
+  let edital = st.edital;
+  if (!edital || !Array.isArray(edital.list) || edital.list.length === 0) {
+    edital = {
+      activeId: DEFAULT_EDITAL_ID,
+      list: [{ id: DEFAULT_EDITAL_ID, name: `${st.settings.concurso || fresh.settings.concurso}`, importedAt: st.startedAt }],
+    };
+  }
+  const topics = st.topics.map((t) => (t.editalId ? t : { ...t, editalId: DEFAULT_EDITAL_ID }));
+  const activeId = edital.list.some((e) => e.id === edital.activeId) ? edital.activeId : edital.list[0].id;
+  return { ...st, edital: { ...edital, activeId }, topics };
 }
 
 export function StoreProvider({ children, storageKey = KEY }: { children: ReactNode; storageKey?: string }) {
@@ -207,6 +234,7 @@ export function StoreProvider({ children, storageKey = KEY }: { children: ReactN
         {
           id: `${subjectId}-${safeId("t")}`,
           subjectId,
+          editalId: s.edital.activeId,
           name: sanitizeText(name, 80),
           status: "nao_iniciado",
           importance: "media",
@@ -218,7 +246,7 @@ export function StoreProvider({ children, storageKey = KEY }: { children: ReactN
     }));
   }, []);
 
-  const applyImportPlan: Store["applyImportPlan"] = useCallback((plan, mode) => {
+  const applyImportPlan: Store["applyImportPlan"] = useCallback((plan, mode, editalId) => {
     const added = plan.reduce((a, p) => a + p.topics.length, 0);
     setState((s) => {
       const subjects = [...s.subjects];
@@ -244,6 +272,7 @@ export function StoreProvider({ children, storageKey = KEY }: { children: ReactN
           newTopics.push({
             id: `${sid}-${safeId("t")}`,
             subjectId: sid,
+            editalId,
             name: sanitizeText(t.name, 140),
             status: "nao_iniciado",
             importance: "media",
@@ -254,15 +283,61 @@ export function StoreProvider({ children, storageKey = KEY }: { children: ReactN
         });
       });
 
-      const topics =
+      /* replace = remove os tópicos DESTE edital nas disciplinas afetadas e recria */
+      const base =
         mode === "replace"
-          ? [...s.topics.filter((t) => !touched.includes(t.subjectId)), ...newTopics]
-          : [...s.topics, ...newTopics];
+          ? s.topics.filter((t) => !(t.editalId === editalId && touched.includes(t.subjectId)))
+          : s.topics;
 
-      return { ...s, subjects, topics };
+      return { ...s, subjects, topics: [...base, ...newTopics] };
     });
     return added;
   }, []);
+
+  /* ---------- múltiplos editais ---------- */
+  const createEdital: Store["createEdital"] = useCallback((name) => {
+    const id = `ed-${safeId("e")}`;
+    const info: EditalInfo = {
+      id,
+      name: sanitizeText(name, 60) || "Novo edital",
+      importedAt: iso(new Date()),
+    };
+    setState((s) => ({
+      ...s,
+      edital: { activeId: id, list: [...s.edital.list, info] },
+    }));
+    return id;
+  }, []);
+
+  const setActiveEdital: Store["setActiveEdital"] = useCallback((id) => {
+    setState((s) =>
+      s.edital.list.some((e) => e.id === id) ? { ...s, edital: { ...s.edital, activeId: id } } : s,
+    );
+  }, []);
+
+  const removeEdital: Store["removeEdital"] = useCallback((id) => {
+    setState((s) => {
+      if (s.edital.list.length <= 1) return s; // mantém ao menos um edital
+      const list = s.edital.list.filter((e) => e.id !== id);
+      const topics = s.topics.filter((t) => t.editalId !== id);
+      const activeId = s.edital.activeId === id ? list[0].id : s.edital.activeId;
+      return { ...s, topics, edital: { activeId, list } };
+    });
+  }, []);
+
+  /* tópicos/disciplinas visíveis = recorte do edital ativo */
+  const visibleTopics = useMemo(
+    () => state.topics.filter((t) => (t.editalId ?? DEFAULT_EDITAL_ID) === state.edital.activeId),
+    [state.topics, state.edital.activeId],
+  );
+  const visibleSubjects = useMemo(() => {
+    const ids = new Set(visibleTopics.map((t) => t.subjectId));
+    return state.subjects.filter((s) => ids.has(s.id));
+  }, [state.subjects, visibleTopics]);
+
+  const activeEdital =
+    state.edital.list.find((e) => e.id === state.edital.activeId) ?? state.edital.list[0];
+  const editalList = state.edital.list;
 
   const togglePlanner: Store["togglePlanner"] = useCallback((dateISO, slot) => {
     setState((s) => {
@@ -394,7 +469,12 @@ export function StoreProvider({ children, storageKey = KEY }: { children: ReactN
     setState((s) => ({ ...s, mocks: s.mocks.filter((m) => m.id !== id) }));
   }, []);
 
-  const stats = useMemo(() => computeStats(state), [state]);
+  /* o Dashboard e os indicadores refletem o edital ativo */
+  const effectiveState = useMemo(
+    () => ({ ...state, topics: visibleTopics, subjects: visibleSubjects }),
+    [state, visibleTopics, visibleSubjects],
+  );
+  const stats = useMemo(() => computeStats(effectiveState), [effectiveState]);
 
   const value: Store = {
     state,
@@ -410,6 +490,13 @@ export function StoreProvider({ children, storageKey = KEY }: { children: ReactN
     setTopicStatus,
     addTopic,
     applyImportPlan,
+    editalList,
+    activeEdital,
+    visibleTopics,
+    visibleSubjects,
+    createEdital,
+    setActiveEdital,
+    removeEdital,
     togglePlanner,
     toggleFocus,
     updateSettings,

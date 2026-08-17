@@ -31,10 +31,10 @@ function IncDots({ n }: { n: number }) {
 }
 
 export default function Ia() {
-  const { state, addAiResult, addQuestionLog, notify } = useStore();
-  const subjects = state.subjects.filter((s) => AI_SUBJECTS.includes(s.id));
-  const [subjectId, setSubjectId] = useState("rlm");
-  const topics = state.topics.filter((t) => t.subjectId === subjectId);
+  const { state, addAiResult, addQuestionLog, notify, visibleSubjects, visibleTopics } = useStore();
+  const subjects = visibleSubjects.filter((s) => AI_SUBJECTS.includes(s.id));
+  const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? "rlm");
+  const topics = visibleTopics.filter((t) => t.subjectId === subjectId);
   const [topicId, setTopicId] = useState("todos");
   const [mode, setMode] = useState<AiMode>("quiz");
   const [generating, setGenerating] = useState(false);
@@ -124,7 +124,7 @@ export default function Ia() {
     addQuestionLog(
       {
         subjectId,
-        topicId: topicId === "todos" ? state.topics.find((t) => t.subjectId === subjectId)!.id : topicId,
+        topicId: topicId === "todos" ? (visibleTopics.find((t) => t.subjectId === subjectId)?.id ?? topicId) : topicId,
         total: lastScore.total,
         correct: lastScore.score,
         errors: [],

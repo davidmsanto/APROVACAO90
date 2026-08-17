@@ -81,8 +81,8 @@ function PastExamForm({ onDone }: { onDone: () => void }) {
 }
 
 export default function Simulados() {
-  const { state, removePastExam, addMock, updateMock, removeMock, addQuestionLog, notify } = useStore();
-  const subjects = state.subjects.filter((s) => s.id !== "sim");
+  const { state, removePastExam, addMock, updateMock, removeMock, addQuestionLog, notify, visibleSubjects, visibleTopics } = useStore();
+  const subjects = visibleSubjects.filter((s) => s.id !== "sim");
   const [selected, setSelected] = useState<string[]>(state.pastExams.slice(0, 2).map((p) => p.id));
   const [totalQ, setTotalQ] = useState(80);
   const [formOpen, setFormOpen] = useState(false);
@@ -101,7 +101,7 @@ export default function Simulados() {
     const distribution: MockSubjectPlan[] = bySubject
       .filter((b) => b.n > 0)
       .map((b) => {
-        const topics = state.topics.filter((t) => t.subjectId === b.id);
+        const topics = visibleTopics.filter((t) => t.subjectId === b.id);
         const tw = topics.map((t) => ({ id: t.id, w: IMP_W[t.importance] * (1 + t.difficulty * 0.12) }));
         const byTopic = allocate(tw, b.n).filter((x) => x.n > 0);
         return { subjectId: b.id, questions: b.n, topics: byTopic.map((x) => ({ topicId: x.id, questions: x.n })) };

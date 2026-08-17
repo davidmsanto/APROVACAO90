@@ -72,7 +72,20 @@ function TopicRow({ t, delay }: { t: Topic; delay: number }) {
 }
 
 export default function Edital() {
-  const { state, stats, editalFilter, setEditalFilter, addTopic, notify } = useStore();
+  const {
+    state,
+    stats,
+    editalFilter,
+    setEditalFilter,
+    addTopic,
+    notify,
+    editalList,
+    activeEdital,
+    setActiveEdital,
+    removeEdital,
+    visibleTopics,
+    visibleSubjects,
+  } = useStore();
   const [importing, setImporting] = useState(false);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<Status | "todos">("todos");
@@ -85,22 +98,26 @@ export default function Edital() {
   const [adding, setAdding] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
 
-  const subjects = state.subjects.filter((s) => s.id !== "sim");
+  const subjects = visibleSubjects.filter((s) => s.id !== "sim");
 
   const filtered = useMemo(() => {
     return subjects
       .filter((s) => !editalFilter || s.id === editalFilter)
       .map((s) => ({
         subject: s,
-        topics: state.topics
+        topics: visibleTopics
           .filter((t) => t.subjectId === s.id)
           .filter((t) => (statusFilter === "todos" ? true : t.status === statusFilter))
           .filter((t) => t.name.toLowerCase().includes(query.toLowerCase())),
       }))
       .filter((g) => g.topics.length > 0 || (!query && statusFilter === "todos"));
-  }, [subjects, state.topics, editalFilter, statusFilter, query]);
+  }, [subjects, visibleTopics, editalFilter, statusFilter, query]);
 
   const filteredSubject = editalFilter ? state.subjects.find((s) => s.id === editalFilter) : null;
+
+  /* contagem de tópicos por edital (para o seletor) */
+  const editalCount = (id: string) =>
+    state.topics.filter((t) => (t.editalId ?? "ed-default") === id).length;
 
   return (
     <div>
@@ -126,6 +143,57 @@ export default function Edital() {
       />
 
       {importing && <ImportEdital onClose={() => setImporting(false)} />}
+
+      {/* seletor de editais */}
+      <Card className="mb-4 p-4" delay={20}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="kicker mr-1 !text-[9px]">Editais</span>
+          {editalList.map((ed) => {
+            const active = ed.id === activeEdital.id;
+            return (
+              <div
+                key={ed.id}
+                className="group flex items-center gap-1.5 rounded-full border py-1.5 pl-3.5 transition-all"
+                style={{
+                  borderColor: active ? "rgba(0,255,104,0.55)" : "rgba(0,255,104,0.15)",
+                  background: active ? "rgba(0,255,104,0.1)" : "transparent",
+                  boxShadow: active ? "0 0 16px rgba(0,255,90,0.18)" : "none",
+                }}
+              >
+                <button
+                  onClick={() => setActiveEdital(ed.id)}
+                  className={`text-[12px] font-semibold transition-colors ${active ? "text-brand2" : "text-fog hover:text-snow"}`}
+                >
+                  {ed.name}
+                </button>
+                <span className="num rounded-full bg-[rgba(0,255,104,0.08)] px-1.5 py-0.5 text-[10px] text-mist">
+                  {editalCount(ed.id)}
+                </span>
+                {editalList.length > 1 && (
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Remover o edital "${ed.name}" e todos os seus tópicos?`)) {
+                        removeEdital(ed.id);
+                        notify(`Edital "${ed.name}" removido.`, "amber");
+                      }
+                    }}
+                    className="mr-1.5 rounded-full p-0.5 text-mist opacity-0 transition-all hover:bg-[rgba(240,101,95,0.15)] hover:text-danger group-hover:opacity-100"
+                    title="Remover edital"
+                  >
+                    <IcX size={11} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          <button
+            onClick={() => setImporting(true)}
+            className="rounded-full border border-dashed border-[rgba(0,255,104,0.3)] px-3.5 py-1.5 text-[12px] font-semibold text-mist transition-all hover:border-[rgba(0,255,104,0.6)] hover:text-brand2"
+          >
+            ＋ adicionar edital
+          </button>
+        </div>
+      </Card>
 
       <Card className="mb-5 flex flex-wrap items-center gap-3 p-4" delay={40}>
         <TextInput placeholder="Buscar tópico…" value={query} onChange={(e) => setQuery(e.target.value)} className="max-w-[240px]" />

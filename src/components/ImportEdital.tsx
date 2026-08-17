@@ -14,7 +14,7 @@ const STEPS = [
 ] as const;
 
 export default function ImportEdital({ onClose }: { onClose: () => void }) {
-  const { state, applyImportPlan, notify } = useStore();
+  const { state, applyImportPlan, notify, createEdital, activeEdital } = useStore();
   const [step, setStep] = useState<Step>("upload");
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -24,9 +24,14 @@ export default function ImportEdital({ onClose }: { onClose: () => void }) {
   const [dragging, setDragging] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
+  const [dest, setDest] = useState<"new" | "current">("new");
+  const [newEditalName, setNewEditalName] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const subjects = state.subjects.filter((s) => s.id !== "sim");
+
+  /* sugestão de nome para o novo edital (concurso + cargo) */
+  const suggestedEditalName = `${state.settings.concurso} — ${state.settings.cargo}`.replace(/\s+/g, " ").trim();
 
   const runParse = (text: string, name: string) => {
     setFileName(name);
@@ -95,13 +100,27 @@ export default function ImportEdital({ onClose }: { onClose: () => void }) {
       setError("Selecione ao menos um tópico para importar.");
       return;
     }
-    const count = applyImportPlan(plan, mode);
+
+    /* destino: novo edital (cria e ativa) ou edital ativo atual */
+    let editalId: string;
+    let effectiveMode: ImportMode;
+    if (dest === "new") {
+      editalId = createEdital(newEditalName.trim() || suggestedEditalName);
+      effectiveMode = "add";
+    } else {
+      editalId = activeEdital.id;
+      effectiveMode = mode;
+    }
+
+    const count = applyImportPlan(plan, effectiveMode, editalId);
     setImported(count);
     setStep("done");
     notify(
-      mode === "replace"
-        ? `Edital substituído: ${count} tópicos no plano.`
-        : `${count} tópicos importados para o edital.`,
+      dest === "new"
+        ? `Novo edital criado: ${count} tópicos importados.`
+        : effectiveMode === "replace"
+          ? `Edital substituído: ${count} tópicos no plano.`
+          : `${count} tópicos adicionados ao edital.`,
       "green",
     );
   };
@@ -274,24 +293,69 @@ export default function ImportEdital({ onClose }: { onClose: () => void }) {
               <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
                 <span className="num text-[13px] text-brand2">{parsed.length} disciplinas detectadas</span>
                 <span className="num text-[13px] text-fog">{includedTopics} tópicos selecionados</span>
-                <div className="ml-auto flex gap-1.5">
-                  {(["add", "replace"] as ImportMode[]).map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => setMode(m)}
-                      className="rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-all active:scale-95"
-                      style={{
-                        borderColor: mode === m ? (m === "replace" ? "rgba(240,101,95,0.6)" : "rgba(0,255,104,0.6)") : "rgba(0,255,104,0.15)",
-                        color: mode === m ? (m === "replace" ? "#f0655f" : "#00ff68") : "#66716b",
-                        background: mode === m ? (m === "replace" ? "rgba(240,101,95,0.1)" : "rgba(0,255,104,0.08)") : "transparent",
-                      }}
-                    >
-                      {m === "add" ? "Adicionar ao edital" : "Substituir disciplinas"}
-                    </button>
-                  ))}
-                </div>
               </div>
-              {mode === "replace" && (
+
+              {/* destino da importação */}
+              <div className="mt-3 rounded-xl border border-[rgba(0,255,104,0.12)] bg-[#04140a] p-3.5">
+                <div className="kicker mb-2.5 !text-[9px]">Destino da importação</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => setDest("new")}
+                    className="rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-all active:scale-95"
+                    style={{
+                      borderColor: dest === "new" ? "rgba(0,255,104,0.6)" : "rgba(0,255,104,0.15)",
+                      color: dest === "new" ? "#00ff68" : "#66716b",
+                      background: dest === "new" ? "rgba(0,255,104,0.08)" : "transparent",
+                    }}
+                  >
+                    ＋ Criar novo edital
+                  </button>
+                  <button
+                    onClick={() => setDest("current")}
+                    className="rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-all active:scale-95"
+                    style={{
+                      borderColor: dest === "current" ? "rgba(92,179,255,0.6)" : "rgba(0,255,104,0.15)",
+                      color: dest === "current" ? "#5cb3ff" : "#66716b",
+                      background: dest === "current" ? "rgba(92,179,255,0.08)" : "transparent",
+                    }}
+                  >
+                    Edital atual · {activeEdital.name}
+                  </button>
+                </div>
+
+                {dest === "new" ? (
+                  <div className="anim-rise mt-3">
+                    <input
+                      value={newEditalName}
+                      onChange={(e) => setNewEditalName(e.target.value)}
+                      placeholder={suggestedEditalName}
+                      className="input !py-2 !text-[12.5px]"
+                    />
+                    <p className="mt-1.5 text-[10.5px] text-mist">
+                      Um novo edital vira o edital ativo — o Dashboard passa a refleti-lo. Você pode alternar entre editais a qualquer momento.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="anim-rise mt-3 flex flex-wrap items-center gap-1.5">
+                    {(["add", "replace"] as ImportMode[]).map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => setMode(m)}
+                        className="rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-all active:scale-95"
+                        style={{
+                          borderColor: mode === m ? (m === "replace" ? "rgba(240,101,95,0.6)" : "rgba(0,255,104,0.6)") : "rgba(0,255,104,0.15)",
+                          color: mode === m ? (m === "replace" ? "#f0655f" : "#00ff68") : "#66716b",
+                          background: mode === m ? (m === "replace" ? "rgba(240,101,95,0.1)" : "rgba(0,255,104,0.08)") : "transparent",
+                        }}
+                      >
+                        {m === "add" ? "Adicionar tópicos" : "Substituir disciplinas"}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {dest === "current" && mode === "replace" && (
                 <div className="anim-rise mt-3 rounded-[10px] border border-[rgba(245,184,75,0.4)] bg-[rgba(245,184,75,0.07)] px-3.5 py-2.5 text-[12px] text-amber">
                   Modo substituição: os tópicos atuais das disciplinas mapeadas serão trocados pelos do arquivo. Questões e status antigos dessas disciplinas são descartados.
                 </div>

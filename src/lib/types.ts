@@ -55,6 +55,7 @@ export interface Subject {
 export interface Topic {
   id: string;
   subjectId: string;
+  editalId?: string; // a qual edital o tópico pertence
   name: string;
   status: Status;
   importance: Importance;
@@ -172,6 +173,16 @@ export interface ImportPlanItem {
 
 export type ImportMode = "add" | "replace";
 
+/* ---------- múltiplos editais ---------- */
+
+export interface EditalInfo {
+  id: string;
+  name: string;
+  importedAt: string;
+}
+
+export const DEFAULT_EDITAL_ID = "ed-default";
+
 export interface AppState {
   subjects: Subject[];
   topics: Topic[];
@@ -184,6 +195,7 @@ export interface AppState {
   pastExams: PastExam[];
   mocks: MockPlan[];
   aiResults: AiResult[];
+  edital: { activeId: string; list: EditalInfo[] };
   startedAt: string;
   settings: Settings;
 }

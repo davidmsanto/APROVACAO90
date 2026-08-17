@@ -60,6 +60,23 @@ export function sanitizeState(raw: unknown, fresh: AppState): AppState {
   if (Array.isArray(p.aiResults)) out.aiResults = p.aiResults;
   if (typeof p.startedAt === "string" && ISO_RE.test(p.startedAt)) out.startedAt = p.startedAt;
 
+  if (p.edital && typeof p.edital === "object") {
+    const e = p.edital as Record<string, unknown>;
+    const list = Array.isArray(e.list)
+      ? (e.list as Record<string, unknown>[])
+          .filter((x) => x && typeof x.id === "string" && typeof x.name === "string")
+          .map((x) => ({
+            id: sanitizeText(x.id, 40),
+            name: sanitizeText(x.name, 60) || "Edital",
+            importedAt: typeof x.importedAt === "string" && ISO_RE.test(x.importedAt) ? x.importedAt : fresh.startedAt,
+          }))
+      : [];
+    if (list.length > 0) {
+      const activeId = typeof e.activeId === "string" && list.some((x) => x.id === e.activeId) ? (e.activeId as string) : list[0].id;
+      out.edital = { activeId, list };
+    }
+  }
+
   if (p.settings && typeof p.settings === "object") {
     const s = p.settings as Record<string, unknown>;
     const fs = fresh.settings;

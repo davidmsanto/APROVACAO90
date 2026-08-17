@@ -8,6 +8,7 @@ import type {
   Subject,
   Topic,
 } from "./types";
+import { DEFAULT_EDITAL_ID } from "./types";
 
 export const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -137,6 +138,7 @@ function buildTopics(): Topic[] {
       out.push({
         id: `${sub.id}-${i + 1}`,
         subjectId: sub.id,
+        editalId: DEFAULT_EDITAL_ID,
         name,
         status: "nao_iniciado",
         importance: IMP[imp],
@@ -303,6 +305,10 @@ export function buildSeed(): AppState {
     pastExams: PAST_EXAMS,
     mocks: [],
     aiResults: [],
+    edital: {
+      activeId: DEFAULT_EDITAL_ID,
+      list: [{ id: DEFAULT_EDITAL_ID, name: "PC/AL 2026 — Agente", importedAt: off(-30) }],
+    },
     startedAt: off(-30),
     settings: {
       concurso: "PC/AL 2026",
