@@ -2,12 +2,23 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../lib/store";
 import type { AiMode } from "../lib/types";
 import { AI_SUBJECTS, MODE_META, topicLabel } from "../lib/knowledge";
-import { generateLocal, generateWithGemini, type AiOutput } from "../lib/ai";
+import { generateAi, pingGeminiDirect, pingGeminiFree, type AiOutput, type PingResult } from "../lib/ai";
 import { fmtDay } from "../lib/calc";
 import { Bar, Btn, Card, Chip, Dot, Select, TabHeader, TextInput, ToggleChip } from "../components/ui";
-import { IcCheck, IcCopy, IcSpark, IcX } from "../components/icons";
+import { IcCheck, IcCopy, IcExternal, IcSpark, IcX } from "../components/icons";
 
 const API_KEY = "aprovacao90:gemini_key";
+
+const ENGINE_LABEL: Record<AiOutput["engine"], string> = {
+  gemini: "gemini 2.5 flash · direto",
+  "gemini-free": "gemini grátis · sem chave",
+  local: "motor local calibrado",
+};
+const ENGINE_COLOR: Record<AiOutput["engine"], string> = {
+  gemini: "#00ff68",
+  "gemini-free": "#5cb3ff",
+  local: "#f5b84b",
+};
 
 function IncDots({ n }: { n: number }) {
   return (
@@ -30,20 +41,55 @@ export default function Ia() {
   const [payload, setPayload] = useState<AiOutput | null>(null);
   const [runId, setRunId] = useState(0);
   const [apiKey, setApiKey] = useState(() => {
-    try { return localStorage.getItem(API_KEY) ?? ""; } catch { return ""; }
+    try {
+      return localStorage.getItem(API_KEY) ?? "";
+    } catch {
+      return "";
+    }
   });
   const [lastScore, setLastScore] = useState<{ score: number; total: number } | null>(null);
   const [registered, setRegistered] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [pingDirect, setPingDirect] = useState<PingResult | null>(null);
+  const [pingFree, setPingFree] = useState<PingResult | null>(null);
+  const [testing, setTesting] = useState<"direct" | "free" | null>(null);
 
   const subject = subjects.find((s) => s.id === subjectId)!;
 
-  useEffect(() => () => clearTimeout(timer.current), []);
-  useEffect(() => { setTopicId("todos"); setPayload(null); }, [subjectId]);
+  useEffect(() => () => {}, []);
+  useEffect(() => {
+    setTopicId("todos");
+    setPayload(null);
+  }, [subjectId]);
 
   const saveKey = (v: string) => {
     setApiKey(v);
-    try { v ? localStorage.setItem(API_KEY, v) : localStorage.removeItem(API_KEY); } catch {}
+    setPingDirect(null);
+    try {
+      if (v) localStorage.setItem(API_KEY, v);
+      else localStorage.removeItem(API_KEY);
+    } catch {
+      /* quota */
+    }
+  };
+
+  const testDirect = async () => {
+    if (!apiKey.trim()) {
+      notify("Cole sua chave do Google AI Studio primeiro.", "amber");
+      return;
+    }
+    setTesting("direct");
+    const r = await pingGeminiDirect(apiKey.trim());
+    setPingDirect(r);
+    setTesting(null);
+    notify(r.ok ? `Gemini direto online · ${r.ms}ms` : "Gemini direto indisponível — o app usará o Gemini grátis.", r.ok ? "green" : "amber");
+  };
+
+  const testFree = async () => {
+    setTesting("free");
+    const r = await pingGeminiFree();
+    setPingFree(r);
+    setTesting(null);
+    notify(r.ok ? `Gemini grátis online · ${r.ms}ms` : "Proxy gratuito fora do ar agora — o motor local cobre a geração.", r.ok ? "green" : "amber");
   };
 
   const generate = async () => {
@@ -51,22 +97,20 @@ export default function Ia() {
     setPayload(null);
     setRegistered(false);
     setLastScore(null);
-    const topicsSel = topicId === "todos" ? [] : [topicLabel(topicId)];
-    let out: AiOutput;
-    if (apiKey.trim()) {
-      try {
-        out = await generateWithGemini(apiKey.trim(), subject.name, topicsSel, mode);
-      } catch {
-        notify("Gemini indisponível — usando o motor local calibrado.", "amber");
-        out = generateLocal(subjectId, topicId === "todos" ? undefined : topicId);
-      }
-    } else {
-      await new Promise((r) => setTimeout(r, 900)); // feedback perceptível
-      out = generateLocal(subjectId, topicId === "todos" ? undefined : topicId);
-    }
+    const out = await generateAi({
+      apiKey,
+      subjectId,
+      subjectName: subject.name,
+      topics: topicId === "todos" ? [] : [topicLabel(topicId)],
+      mode,
+      topicId: topicId === "todos" ? undefined : topicId,
+    });
     setPayload(out);
     setRunId((r) => r + 1);
     setGenerating(false);
+    if (out.engine === "local") {
+      notify("Gemini indisponível agora — conteúdo gerado pelo motor local calibrado.", "amber");
+    }
   };
 
   const finish = (score: number, total: number) => {
@@ -76,7 +120,7 @@ export default function Ia() {
   };
 
   const registerQuiz = () => {
-    if (!lastScore || !payload) return;
+    if (!lastScore) return;
     addQuestionLog(
       {
         subjectId,
@@ -94,19 +138,21 @@ export default function Ia() {
 
   const history = useMemo(() => [...state.aiResults].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 8), [state.aiResults]);
 
+  const activeEngine: AiOutput["engine"] = apiKey.trim() ? "gemini" : "gemini-free";
+
   return (
     <div>
       <TabHeader
         index="10"
         kicker="Motor A90 · conteúdo calibrado"
         title="IA de estudo"
-        desc="Flashcards, questões C/E e resumos do que MAIS CAI em prova. Com chave Gemini gera em tempo real; sem chave, usa o motor local calibrado."
-        right={<Chip color="#c9a2ff">{apiKey ? "motor: gemini 2.5 flash" : "motor: local calibrado"}</Chip>}
+        desc="Flashcards, questões C/E e resumos do que MAIS CAI em prova. O Gemini grátis já vem ligado — sem chave, sem cadastro, sem custo."
+        right={<Chip color={ENGINE_COLOR[activeEngine]}>{ENGINE_LABEL[activeEngine]}</Chip>}
       />
 
       <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-        {/* painel de geração */}
         <div className="space-y-5">
+          {/* painel de geração */}
           <Card className="p-6" delay={0}>
             <div className="kicker mb-4">Configurar geração</div>
             <div className="kicker mb-2 !text-[9.5px]">Disciplina</div>
@@ -120,7 +166,11 @@ export default function Ia() {
             <div className="kicker mb-2 mt-5 !text-[9.5px]">Recorte do edital</div>
             <Select value={topicId} onChange={(e) => setTopicId(e.target.value)}>
               <option value="todos">Todos os tópicos calibrados</option>
-              {topics.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              {topics.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
             </Select>
             <div className="kicker mb-2 mt-5 !text-[9.5px]">Formato</div>
             <div className="space-y-2.5">
@@ -150,16 +200,90 @@ export default function Ia() {
             </Btn>
           </Card>
 
+          {/* motores de IA */}
           <Card className="p-6" delay={60}>
-            <div className="kicker mb-2 flex items-center gap-2"><IcSpark size={13} /> Chave Gemini (opcional)</div>
-            <TextInput
-              type="password"
-              placeholder="Cole sua chave para gerar com IA real"
-              value={apiKey}
-              onChange={(e) => saveKey(e.target.value)}
-            />
-            <p className="mt-2 text-[10.5px] leading-relaxed text-mist">
-              Grátis no Google AI Studio. Fica salva só no seu navegador — no PWA multiusuário ela migra para um proxy de backend.
+            <div className="kicker mb-3 flex items-center gap-2">
+              <IcSpark size={13} /> Motores de IA
+            </div>
+
+            {/* Gemini grátis */}
+            <div
+              className="rounded-xl border p-3.5 transition-all"
+              style={{
+                borderColor: !apiKey ? "rgba(92,179,255,0.45)" : "rgba(0,255,104,0.12)",
+                background: !apiKey ? "rgba(92,179,255,0.05)" : "#04140a",
+                boxShadow: !apiKey ? "0 0 22px rgba(92,179,255,0.12)" : "none",
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <Dot color="#5cb3ff" pulse={!apiKey} size={8} />
+                <span className="text-[13px] font-semibold text-snow">Gemini grátis</span>
+                <span className="ml-auto flex items-center gap-2">
+                  {pingFree && (
+                    <span className="num text-[10.5px]" style={{ color: pingFree.ok ? "#00ff68" : "#f0655f" }}>
+                      {pingFree.ok ? `${pingFree.ms}ms` : "offline"}
+                    </span>
+                  )}
+                  <button
+                    onClick={testFree}
+                    disabled={testing === "free"}
+                    className="rounded-full border border-[rgba(92,179,255,0.4)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-info transition-all hover:bg-[rgba(92,179,255,0.1)] active:scale-95 disabled:opacity-50"
+                  >
+                    {testing === "free" ? "testando…" : "testar"}
+                  </button>
+                </span>
+              </div>
+              <p className="mt-1.5 text-[10.5px] leading-relaxed text-mist">
+                {!apiKey ? "Motor ativo agora. Zero configuração — a geração já usa a IA gratuita." : "Reserva automática se o Gemini direto falhar."}
+              </p>
+            </div>
+
+            {/* Gemini direto */}
+            <div className="mt-3 rounded-xl border border-[rgba(0,255,104,0.12)] bg-[#04140a] p-3.5">
+              <div className="flex items-center gap-2">
+                <Dot color={apiKey ? "#00ff68" : "#66716b"} pulse={!!apiKey} size={8} />
+                <span className="text-[13px] font-semibold text-snow">Gemini direto</span>
+                <span className="ml-auto flex items-center gap-2">
+                  {pingDirect && (
+                    <span className="num text-[10.5px]" style={{ color: pingDirect.ok ? "#00ff68" : "#f0655f" }}>
+                      {pingDirect.ok ? `${pingDirect.ms}ms` : "falhou"}
+                    </span>
+                  )}
+                  <button
+                    onClick={testDirect}
+                    disabled={testing === "direct"}
+                    className="rounded-full border border-[rgba(0,255,104,0.35)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-brand2 transition-all hover:bg-[rgba(0,255,104,0.08)] active:scale-95 disabled:opacity-50"
+                  >
+                    {testing === "direct" ? "testando…" : "testar"}
+                  </button>
+                </span>
+              </div>
+              <TextInput
+                type="password"
+                placeholder="Chave Google AI Studio (opcional)"
+                value={apiKey}
+                onChange={(e) => saveKey(e.target.value)}
+                className="mt-2.5 !py-2 !text-[12px]"
+              />
+              <a
+                href="https://aistudio.google.com/apikey"
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 flex items-center gap-1.5 text-[10.5px] font-semibold text-brand2 hover:underline"
+              >
+                Criar chave gratuita no AI Studio <IcExternal size={11} />
+              </a>
+            </div>
+
+            {/* motor local */}
+            <div className="mt-3 flex items-center gap-2 rounded-xl border border-[rgba(0,255,104,0.1)] bg-[#04140a] px-3.5 py-2.5">
+              <Dot color="#f5b84b" size={8} />
+              <span className="text-[12.5px] font-semibold text-snow">Motor local calibrado</span>
+              <span className="num ml-auto text-[10px] uppercase tracking-[0.1em] text-mist">sempre on</span>
+            </div>
+
+            <p className="mt-3.5 text-[10.5px] leading-relaxed text-mist">
+              Cadeia automática: direto → grátis → local. A chave fica só no seu navegador; a geração gratuita não usa chave nenhuma.
             </p>
           </Card>
         </div>
@@ -185,7 +309,7 @@ export default function Ia() {
                 </div>
                 <div className="mt-4 font-display text-[18px] font-semibold text-snow">Pronto para gerar</div>
                 <p className="mt-1.5 max-w-sm text-[12.5px] leading-relaxed text-mist">
-                  Escolha disciplina, recorte e formato. O conteúdo vem priorizado pela incidência real em provas estilo Cebraspe.
+                  Escolha disciplina, recorte e formato. O Gemini grátis já está ativo — nenhum cadastro necessário.
                 </p>
               </div>
             )}
@@ -195,10 +319,14 @@ export default function Ia() {
                 <div className="mb-4 flex flex-wrap items-center gap-2">
                   <Chip color={subject.color}>{subject.name}</Chip>
                   <Chip color="#c9a2ff">{MODE_META[mode].label.toUpperCase()}</Chip>
-                  <Chip color={payload.engine === "gemini" ? "#00ff68" : "#f5b84b"}>
-                    {payload.engine === "gemini" ? "gemini 2.5 flash" : "local calibrado"}
+                  <Chip color={ENGINE_COLOR[payload.engine]}>
+                    <span className="pulse-g inline-block h-1.5 w-1.5 rounded-full" style={{ background: ENGINE_COLOR[payload.engine] }} />
+                    {ENGINE_LABEL[payload.engine]}
                   </Chip>
-                  <button onClick={generate} className="ml-auto text-[12px] font-semibold text-brand2 hover:underline">↻ gerar novamente</button>
+                  {payload.ms > 0 && <Chip color="#a5b0aa">{(payload.ms / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}s</Chip>}
+                  <button onClick={generate} className="ml-auto text-[12px] font-semibold text-brand2 hover:underline">
+                    ↻ gerar novamente
+                  </button>
                 </div>
 
                 {mode === "flashcards" && <Flashcards cards={payload.flashcards} onDone={(s, t) => finish(s, t)} />}
@@ -213,7 +341,13 @@ export default function Ia() {
                   Levar o resultado para o Dashboard? Alimenta o aproveitamento de <b className="text-snow">{subject.name}</b>.
                 </span>
                 <Btn size="sm" onClick={registerQuiz} disabled={registered}>
-                  {registered ? <><IcCheck size={13} /> Registrado</> : "Registrar no Dashboard"}
+                  {registered ? (
+                    <>
+                      <IcCheck size={13} /> Registrado
+                    </>
+                  ) : (
+                    "Registrar no Dashboard"
+                  )}
                 </Btn>
               </div>
             )}
@@ -269,7 +403,10 @@ function Flashcards({ cards, onDone }: { cards: { q: string; a: string }[]; onDo
     setKnown(k);
     if (idx + 1 >= cards.length) {
       setDone(true);
-      if (!saved.current) { saved.current = true; onDone(k, cards.length); }
+      if (!saved.current) {
+        saved.current = true;
+        onDone(k, cards.length);
+      }
       return;
     }
     setFlipped(false);
@@ -280,8 +417,12 @@ function Flashcards({ cards, onDone }: { cards: { q: string; a: string }[]; onDo
     const pct = Math.round((known / cards.length) * 100);
     return (
       <div className="anim-rise flex flex-col items-center rounded-2xl border border-[rgba(0,255,104,0.12)] bg-[#04140a] p-10 text-center">
-        <span className="num text-[56px] font-semibold leading-none" style={{ color: pct >= 70 ? "#00ff68" : pct >= 50 ? "#f5b84b" : "#f0655f" }}>{known}/{cards.length}</span>
-        <div className="mt-2 text-[13.5px] text-fog">{pct >= 80 ? "Domínio sólido — siga para questões de banca." : pct >= 50 ? "Bom caminho — repita os cards difíceis amanhã." : "Base fraca: volte à videoaula e refaça o deck."}</div>
+        <span className="num text-[56px] font-semibold leading-none" style={{ color: pct >= 70 ? "#00ff68" : pct >= 50 ? "#f5b84b" : "#f0655f" }}>
+          {known}/{cards.length}
+        </span>
+        <div className="mt-2 text-[13.5px] text-fog">
+          {pct >= 80 ? "Domínio sólido — siga para questões de banca." : pct >= 50 ? "Bom caminho — repita os cards difíceis amanhã." : "Base fraca: volte à videoaula e refaça o deck."}
+        </div>
       </div>
     );
   }
@@ -290,8 +431,12 @@ function Flashcards({ cards, onDone }: { cards: { q: string; a: string }[]; onDo
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
-        <span className="num text-[12px] text-mist">Card {idx + 1} de {cards.length}</span>
-        <div className="w-40"><Bar pct={((idx + (flipped ? 1 : 0)) / cards.length) * 100} color="#00ff68" h={5} /></div>
+        <span className="num text-[12px] text-mist">
+          Card {idx + 1} de {cards.length}
+        </span>
+        <div className="w-40">
+          <Bar pct={((idx + (flipped ? 1 : 0)) / cards.length) * 100} color="#00ff68" h={5} />
+        </div>
         <span className="num text-[12px] text-brand2">{known} dominados</span>
       </div>
       <button className="flip-scene block h-[240px] w-full cursor-pointer text-left" onClick={() => setFlipped((f) => !f)}>
@@ -309,15 +454,25 @@ function Flashcards({ cards, onDone }: { cards: { q: string; a: string }[]; onDo
         </div>
       </button>
       <div className="mt-4 flex items-center justify-center gap-3">
-        <Btn variant="danger" onClick={() => next(false)} disabled={!flipped}><IcX size={14} /> Ainda não domino</Btn>
-        <Btn onClick={() => next(true)} disabled={!flipped}><IcCheck size={14} /> Já domino</Btn>
+        <Btn variant="danger" onClick={() => next(false)} disabled={!flipped}>
+          <IcX size={14} /> Ainda não domino
+        </Btn>
+        <Btn onClick={() => next(true)} disabled={!flipped}>
+          <IcCheck size={14} /> Já domino
+        </Btn>
       </div>
     </div>
   );
 }
 
 /* ================= quiz C/E ================= */
-function Quiz({ questions, onDone }: { questions: { statement: string; correct: boolean; expl: string }[]; onDone: (score: number, total: number) => void }) {
+function Quiz({
+  questions,
+  onDone,
+}: {
+  questions: { statement: string; correct: boolean; expl: string }[];
+  onDone: (score: number, total: number) => void;
+}) {
   const [idx, setIdx] = useState(0);
   const [answer, setAnswer] = useState<boolean | null>(null);
   const [score, setScore] = useState(0);
@@ -334,7 +489,10 @@ function Quiz({ questions, onDone }: { questions: { statement: string; correct: 
   const next = () => {
     if (idx + 1 >= questions.length) {
       setFinished(true);
-      if (!saved.current) { saved.current = true; onDone(score, questions.length); }
+      if (!saved.current) {
+        saved.current = true;
+        onDone(score, questions.length);
+      }
       return;
     }
     setIdx(idx + 1);
@@ -345,9 +503,15 @@ function Quiz({ questions, onDone }: { questions: { statement: string; correct: 
     const pct = Math.round((score / questions.length) * 100);
     return (
       <div className="anim-rise flex flex-col items-center rounded-2xl border border-[rgba(0,255,104,0.12)] bg-[#04140a] p-10 text-center">
-        <span className="num text-[56px] font-semibold leading-none" style={{ color: pct >= 70 ? "#00ff68" : pct >= 50 ? "#f5b84b" : "#f0655f" }}>{pct}%</span>
-        <div className="mt-2 text-[13.5px] text-fog">{score} de {questions.length} itens — {pct >= 75 ? "nível de aprovado." : pct >= 50 ? "em evolução. Releia as explicações." : "abaixo da zona de corte. Foque nas explicações."}</div>
-        <div className="mt-3"><Chip color={pct >= 70 ? "#00ff68" : "#f5b84b"}>META CEBRASPE: ≥70%</Chip></div>
+        <span className="num text-[56px] font-semibold leading-none" style={{ color: pct >= 70 ? "#00ff68" : pct >= 50 ? "#f5b84b" : "#f0655f" }}>
+          {pct}%
+        </span>
+        <div className="mt-2 text-[13.5px] text-fog">
+          {score} de {questions.length} itens — {pct >= 75 ? "nível de aprovado." : pct >= 50 ? "em evolução. Releia as explicações." : "abaixo da zona de corte. Foque nas explicações."}
+        </div>
+        <div className="mt-3">
+          <Chip color={pct >= 70 ? "#00ff68" : "#f5b84b"}>META CEBRASPE: ≥70%</Chip>
+        </div>
       </div>
     );
   }
@@ -356,8 +520,12 @@ function Quiz({ questions, onDone }: { questions: { statement: string; correct: 
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
-        <span className="num text-[12px] text-mist">Item {idx + 1} de {questions.length}</span>
-        <div className="w-40"><Bar pct={(idx / questions.length) * 100} color="#00ff68" h={5} /></div>
+        <span className="num text-[12px] text-mist">
+          Item {idx + 1} de {questions.length}
+        </span>
+        <div className="w-40">
+          <Bar pct={(idx / questions.length) * 100} color="#00ff68" h={5} />
+        </div>
         <span className="num text-[12px] text-brand2">{score} certos</span>
       </div>
       <div className="rounded-2xl border border-[rgba(0,255,104,0.12)] bg-[#04140a] p-6">
@@ -390,7 +558,13 @@ function Quiz({ questions, onDone }: { questions: { statement: string; correct: 
           </button>
         </div>
         {answer !== null && (
-          <div className="anim-rise mt-4 rounded-xl border p-4" style={{ borderColor: hit ? "rgba(0,255,104,0.35)" : "rgba(240,101,95,0.35)", background: hit ? "rgba(0,255,104,0.06)" : "rgba(240,101,95,0.06)" }}>
+          <div
+            className="anim-rise mt-4 rounded-xl border p-4"
+            style={{
+              borderColor: hit ? "rgba(0,255,104,0.35)" : "rgba(240,101,95,0.35)",
+              background: hit ? "rgba(0,255,104,0.06)" : "rgba(240,101,95,0.06)",
+            }}
+          >
             <div className="flex items-center gap-2 text-[13px] font-extrabold" style={{ color: hit ? "#00ff68" : "#f0655f" }}>
               {hit ? <IcCheck size={15} /> : <IcX size={15} />}
               {hit ? "Você acertou" : "Errou"} — gabarito: {q.correct ? "CERTO" : "ERRADO"}
@@ -420,7 +594,9 @@ function Resumo({ blocks }: { blocks: { topic: string; inc: number; points: stri
     <div>
       <div className="mb-4 flex items-center justify-between">
         <span className="text-[12.5px] text-fog">{blocks.length} blocos · ★ = incidência em prova</span>
-        <Btn size="sm" variant="ghost" onClick={copy}><IcCopy size={13} /> Copiar resumo</Btn>
+        <Btn size="sm" variant="ghost" onClick={copy}>
+          <IcCopy size={13} /> Copiar resumo
+        </Btn>
       </div>
       <div className="space-y-4">
         {blocks.map((b, i) => (
@@ -440,7 +616,9 @@ function Resumo({ blocks }: { blocks: { topic: string; inc: number; points: stri
             </ul>
             <div className="mt-3.5 flex items-start gap-2.5 rounded-lg border border-amber/25 bg-amber/[0.06] px-3.5 py-2.5 text-[12.5px] text-amber">
               <span className="font-extrabold">⚠ PEGADINHA:</span>
-              <span className="text-fog"><i>“{b.wrong}”</i> — parece certo, mas a banca anula.</span>
+              <span className="text-fog">
+                <i>“{b.wrong}”</i> — parece certo, mas a banca anula.
+              </span>
             </div>
           </div>
         ))}
