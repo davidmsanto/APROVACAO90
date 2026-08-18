@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
  * Cadeia: /logo.png (local) → logo do Drive → tile "90" (fallback).
  */
 
-const DRIVE_ID = "1kcakNtxhifGUumuaL_RJ" + "EBP7yVRhgq_a";
+const DRIVE_ID = "1ZJHDl5HJ_29JKPOQC6T1VFQSu1Xj44EK";
 const CANDIDATES = [
   "/logo.png",
   "/logo.svg",

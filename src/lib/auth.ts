@@ -188,7 +188,7 @@ export async function enterDemo(): Promise<UserRecord> {
   } else {
     demo = {
       id: "demo-a90",
-      name: "Concurseira Demo",
+      name: "Estudante Demo",
       email: DEMO_EMAIL,
       passHash: await hashPass("demo90"),
       createdAt: Date.now(),
