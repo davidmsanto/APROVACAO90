@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../lib/store";
-import type { Status, Topic } from "../lib/types";
+import type { EditalInfo, Status, Topic } from "../lib/types";
 import { STATUS_LIST, statusMeta } from "../lib/types";
 import { fmtNum, fmtPct } from "../lib/calc";
 import { Bar, Card, Chip, Dot, TabHeader, TextInput, Select } from "../components/ui";
-import { IcChevron, IcPlus, IcUpload, IcX } from "../components/icons";
+import { IcChevron, IcPlus, IcTrash, IcUpload, IcX } from "../components/icons";
 import ImportEdital from "../components/ImportEdital";
 
 const IMP_COLOR = { alta: "#f0655f", media: "#f5b84b", baixa: "#66716b" } as const;
@@ -98,6 +98,43 @@ export default function Edital() {
   const [adding, setAdding] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
 
+  /* remoção de edital: confirmação em duas etapas, inline */
+  const [armedId, setArmedId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const armTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(armTimer.current), []);
+
+  const handleRemoveEdital = (ed: EditalInfo) => {
+    if (editalList.length <= 1) {
+      notify("O último edital não pode ser removido — importe outro antes.", "amber");
+      return;
+    }
+    /* 1º clique: arma a confirmação (auto-cancela em 3,5s) */
+    if (armedId !== ed.id) {
+      setArmedId(ed.id);
+      clearTimeout(armTimer.current);
+      armTimer.current = setTimeout(() => setArmedId(null), 3500);
+      return;
+    }
+    /* 2º clique: confirma — anima a saída e remove */
+    clearTimeout(armTimer.current);
+    setArmedId(null);
+    setRemovingId(ed.id);
+    const count = editalCount(ed.id);
+    const wasActive = ed.id === activeEdital.id;
+    const nextName = editalList.find((e) => e.id !== ed.id)?.name ?? "";
+    setTimeout(() => {
+      removeEdital(ed.id);
+      setRemovingId(null);
+      notify(
+        wasActive
+          ? `Edital "${ed.name}" removido (${count} tópicos) — agora ativo: ${nextName}.`
+          : `Edital "${ed.name}" removido (${count} tópicos).`,
+        "amber",
+      );
+    }, 280);
+  };
+
   const subjects = visibleSubjects.filter((s) => s.id !== "sim");
 
   const filtered = useMemo(() => {
@@ -150,39 +187,59 @@ export default function Edital() {
           <span className="kicker mr-1 !text-[9px]">Editais</span>
           {editalList.map((ed) => {
             const active = ed.id === activeEdital.id;
+            const armed = armedId === ed.id;
+            const removing = removingId === ed.id;
+            const danger = armed || removing;
             return (
               <div
                 key={ed.id}
-                className="group flex items-center gap-1.5 rounded-full border py-1.5 pl-3.5 transition-all"
+                className="group flex items-center gap-1.5 rounded-full border py-1.5 pl-3.5 transition-all duration-300"
                 style={{
-                  borderColor: active ? "rgba(0,255,104,0.55)" : "rgba(0,255,104,0.15)",
-                  background: active ? "rgba(0,255,104,0.1)" : "transparent",
-                  boxShadow: active ? "0 0 16px rgba(0,255,90,0.18)" : "none",
+                  borderColor: danger ? "rgba(240,101,95,0.6)" : active ? "rgba(0,255,104,0.55)" : "rgba(0,255,104,0.15)",
+                  background: danger ? "rgba(240,101,95,0.08)" : active ? "rgba(0,255,104,0.1)" : "transparent",
+                  boxShadow: danger ? "0 0 16px rgba(240,101,95,0.22)" : active ? "0 0 16px rgba(0,255,90,0.18)" : "none",
+                  opacity: removing ? 0 : 1,
+                  transform: removing ? "scale(0.82)" : "scale(1)",
                 }}
               >
                 <button
-                  onClick={() => setActiveEdital(ed.id)}
-                  className={`text-[12px] font-semibold transition-colors ${active ? "text-brand2" : "text-fog hover:text-snow"}`}
+                  onClick={() => !armed && setActiveEdital(ed.id)}
+                  className={`text-[12px] font-semibold transition-colors ${danger ? "text-danger" : active ? "text-brand2" : "text-fog hover:text-snow"}`}
                 >
                   {ed.name}
                 </button>
-                <span className="num rounded-full bg-[rgba(0,255,104,0.08)] px-1.5 py-0.5 text-[10px] text-mist">
+                <span
+                  className="num rounded-full px-1.5 py-0.5 text-[10px] transition-colors"
+                  style={{
+                    background: danger ? "rgba(240,101,95,0.15)" : "rgba(0,255,104,0.08)",
+                    color: danger ? "#f0655f" : undefined,
+                  }}
+                >
                   {editalCount(ed.id)}
                 </span>
-                {editalList.length > 1 && (
-                  <button
-                    onClick={() => {
-                      if (window.confirm(`Remover o edital "${ed.name}" e todos os seus tópicos?`)) {
-                        removeEdital(ed.id);
-                        notify(`Edital "${ed.name}" removido.`, "amber");
-                      }
-                    }}
-                    className="mr-1.5 rounded-full p-0.5 text-mist opacity-0 transition-all hover:bg-[rgba(240,101,95,0.15)] hover:text-danger group-hover:opacity-100"
-                    title="Remover edital"
-                  >
-                    <IcX size={11} />
-                  </button>
-                )}
+                <button
+                  onClick={() => handleRemoveEdital(ed)}
+                  className={`mr-1.5 flex items-center gap-1 rounded-full transition-all duration-200 active:scale-90 ${
+                    armed
+                      ? "anim-rise bg-[#f0655f] px-2 py-1 text-[9.5px] font-bold uppercase tracking-[0.06em] text-[#160503] shadow-[0_0_14px_rgba(240,101,95,0.5)]"
+                      : "p-1 text-mist hover:bg-[rgba(240,101,95,0.15)] hover:text-danger"
+                  }`}
+                  title={
+                    editalList.length <= 1
+                      ? "O último edital não pode ser removido"
+                      : armed
+                        ? "Clique de novo para confirmar a remoção"
+                        : "Remover edital"
+                  }
+                >
+                  {armed ? (
+                    <>
+                      remover?
+                    </>
+                  ) : (
+                    <IcTrash size={12} />
+                  )}
+                </button>
               </div>
             );
           })}
